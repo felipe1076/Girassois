@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Girassóis - Jornada da Empatia | Setembro Amarelo</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div id="game-container">
+        <!-- Canvas Principal -->
+        <canvas id="game-canvas"></canvas>
+
+        <!-- Camada de Interface Superior (HUD) -->
+        <div id="ui-layer">
+            <div class="hud-top">
+                <div class="hud-left">
+                    <div id="hearts-container" class="hearts-container">
+                        <!-- Gerado dinamicamente com hud_coracao.png -->
+                    </div>
+
+                    <div class="score-badge">
+                        <span>💛 Empatia:</span>
+                        <span id="score-display" class="value">0</span>
+                    </div>
+
+                    <!-- Medidor de Esperança / Iluminação do Mundo -->
+                    <div class="hope-badge">
+                        <span>☀️ Esperança:</span>
+                        <div class="hope-meter">
+                            <div id="hope-bar-fill" class="hope-fill" style="width: 15%;"></div>
+                        </div>
+                        <span id="hope-value">15%</span>
+                    </div>
+
+                    <!-- Indicador de Puzzles (Chaves da Fase 5 ou Altares da Fase 6) -->
+                    <div id="puzzle-badge" class="puzzle-badge hidden">
+                        <span id="puzzle-status-text">🔑 Chaves: 0/3</span>
+                    </div>
+                </div>
+
+                <!-- Mensagem flutuante de incentivo ao coletar itens -->
+                <div id="phrase-banner">Você não está sozinho!</div>
+
+                <div class="hud-right">
+                    <!-- Comando do Coelho: Seguir ou Ficar no Lugar -->
+                    <button id="btn-bunny-toggle" class="ability-btn bunny-btn" title="Comandar Coelho: Seguir ou Ficar no Botão (Tecla F ou Q)">
+                        <span id="bunny-cmd-text">🐰 Seguir [F]</span>
+                    </button>
+
+                    <!-- Habilidade de Onda de Luz -->
+                    <button id="btn-wave-ability" class="ability-btn" title="Liberar Onda de Luz (Tecla E ou J)">
+                        <span>✨ Luz [E]</span>
+                        <div id="wave-cooldown-overlay" class="cooldown-overlay"></div>
+                    </button>
+
+                    <div id="level-name-display" class="level-title-badge">Fase 1</div>
+                    <button id="btn-mode-toggle" class="btn-icon" title="Alternar Modo: Computador (Teclado) / Tablet (Botões na Tela)">📱</button>
+                    <button id="btn-sound-toggle" class="btn-icon" title="Ativar/Desativar Som">🔊</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tela de Carregamento -->
+        <div id="modal-loading" class="modal-screen">
+            <h1>🌻 Carregando Girassóis...</h1>
+            <p id="loading-text">Preparando cenários, coelhinho companheiro e quebra-cabeças de acolhimento...</p>
+            <div style="width: 300px; height: 12px; background: rgba(255,255,255,0.2); border-radius: 6px; overflow: hidden; margin-top: 10px;">
+                <div id="loading-bar-fill" style="width: 0%; height: 100%; background: #ffd700; transition: width 0.2s;"></div>
+            </div>
+        </div>
+
+        <!-- Tela de Início -->
+        <div id="modal-start" class="modal-screen hidden">
+            <h1>🌻 Girassóis: A Jornada da Empatia</h1>
+            <h2>Setembro Amarelo — 7 Fases de Aventura, Puzzles & Chefe Final</h2>
+            <p>
+                Uma jornada sensível de autodescoberta e saúde mental.
+                Desvie dos sentimentos difíceis, use sua <strong>Onda de Luz [E]</strong> para revelar caminhos e acolher a dor,
+                e colabore com seu fiel <strong>Coelho de Apoio Emocional</strong> usando <strong>[F]</strong> para solucionar quebra-cabeças!
+            </p>
+
+            <!-- Seletor de Modo: Computador vs Tablet -->
+            <div class="mode-select-box">
+                <span class="mode-select-label">Como deseja jogar?</span>
+                <div class="mode-select-buttons">
+                    <button id="btn-select-pc" class="btn-mode-choice active" type="button">
+                        <span class="mode-icon">💻</span>
+                        <div class="mode-text">
+                            <strong>Computador</strong>
+                            <small>Teclado</small>
+                        </div>
+                    </button>
+                    <button id="btn-select-tablet" class="btn-mode-choice" type="button">
+                        <span class="mode-icon">📱</span>
+                        <div class="mode-text">
+                            <strong>Tablet / Toque</strong>
+                            <small>Botões na tela</small>
+                        </div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Dicas de Controle para PC -->
+            <div id="hint-pc" class="controls-hint">
+                <div><span class="key-tag">←</span> <span class="key-tag">→</span> ou <span class="key-tag">A</span> <span class="key-tag">D</span> Mover</div>
+                <div><span class="key-tag">Espaço</span> ou <span class="key-tag">W</span> / <span class="key-tag">↑</span> Pular (Pulo Duplo)</div>
+                <div><span class="key-tag">E</span> ou <span class="key-tag">J</span> Onda de Luz & Disparo Solar</div>
+                <div><span class="key-tag">F</span> ou <span class="key-tag">Q</span> Comandar Coelho</div>
+                <div><span class="key-tag">M</span> Som</div>
+            </div>
+
+            <!-- Dicas de Controle para Tablet -->
+            <div id="hint-tablet" class="controls-hint hidden">
+                <div><span class="key-tag">◀</span> <span class="key-tag">▶</span> Mover (D-Pad na tela)</div>
+                <div><span class="key-tag">⬆ PULAR</span> Pulo Simples & Pulo Duplo</div>
+                <div><span class="key-tag">✨ LUZ</span> Onda de Luz & Disparo Solar</div>
+                <div><span class="key-tag">🐰 COELHO</span> Mandar Seguir ou Esperar</div>
+            </div>
+
+            <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 10px;">
+                <button id="btn-start" class="btn-primary">Iniciar Jornada Completa 💛</button>
+                <button id="btn-start-runner" class="btn-primary" type="button" style="background: linear-gradient(135deg, #0284c7, #0f766e); border-color: #38bdf8;">Fase 3: Corrida da Superação</button>
+                <button id="btn-start-boss" class="btn-primary" type="button" style="background: linear-gradient(135deg, #7b2cbf, #c1121f); border-color: #ffd700;">Chefe Final (Fase 7) 👾</button>
+            </div>
+        </div>
+
+        <!-- Tela de Transição de Fase -->
+        <div id="modal-level-complete" class="modal-screen hidden">
+            <h1>✨ Fase Concluída!</h1>
+            <h2 id="modal-level-title">Parabéns!</h2>
+            <p id="modal-level-msg">Você acolheu seus sentimentos e encontrou um novo caminho.</p>
+            <button id="btn-next-level" class="btn-primary">Avançar para a Próxima Fase 🌻</button>
+        </div>
+
+        <!-- Tela de Tentar Novamente (Acolhedora) -->
+        <div id="modal-game-over" class="modal-screen hidden">
+            <h1 style="color: #ffe066;">🍃 Respire Fundo...</h1>
+            <h2>Não há problema em tropeçar.</h2>
+            <p>
+                Às vezes os pensamentos pesam e a caminhada cansa, mas lembre-se:
+                seu coelho e uma rede de apoio estão com você. Cada novo passo é uma oportunidade de recomeçar com calma e carinho.
+            </p>
+            <button id="btn-retry" class="btn-primary">Tentar Novamente com Serenidade 💛</button>
+        </div>
+
+        <!-- Tela Final de Vitória e Homenagem ao Setembro Amarelo -->
+        <div id="modal-victory" class="modal-screen hidden">
+            <h1>🌻 Você Iluminou Toda a Jornada! 🌻</h1>
+            <h2>A Vida Sempre Vale a Pena</h2>
+            <p>
+                Você superou os abismos, resolveu os enigmas da mente ao lado do seu coelhinho e completou as 7 fases (incluindo a vitória contra a Grande Sombra)
+                com <strong><span id="victory-score">0</span> pontos de Empatia</strong> e conquistou <strong><span id="victory-achievements">0/9</span> Marcos de Superação</strong>!
+            </p>
+
+            <div class="helpline-box">
+                <h3>Canais de Apoio e Valorização da Vida</h3>
+                <p>Se você ou alguém que você conhece está passando por momentos difíceis, lembre-se de que não está sozinho:</p>
+                <p>📞 <strong>CVV (Centro de Valorização da Vida):</strong> Ligue <strong>188</strong> (Gratuito, confidencial, 24 horas por dia)</p>
+                <p>📞 <strong>Central de Atendimento à Mulher:</strong> Ligue <strong>180</strong></p>
+                <p>📞 <strong>Polícia Militar / Emergência:</strong> Ligue <strong>190</strong></p>
+            </div>
+
+            <button id="btn-restart-game" class="btn-primary">Recomeçar a Jornada 💛</button>
+        </div>
+
+        <!-- Camada de Controles Touch na Tela (Modo Tablet / Mobile) -->
+        <div id="touch-controls-layer" class="touch-controls-layer hidden">
+            <!-- D-Pad de Movimentação (Polegar Esquerdo) -->
+            <div class="touch-dpad">
+                <button id="touch-btn-left" class="touch-btn touch-btn-dpad" type="button" aria-label="Mover para a esquerda">
+                    <span class="touch-icon">◀</span>
+                </button>
+                <button id="touch-btn-right" class="touch-btn touch-btn-dpad" type="button" aria-label="Mover para a direita">
+                    <span class="touch-icon">▶</span>
+                </button>
+            </div>
+
+            <!-- Botões de Ação (Polegar Direito) -->
+            <div class="touch-actions">
+                <div class="touch-sub-actions">
+                    <button id="touch-btn-wave" class="touch-btn touch-btn-action ability-light" type="button" aria-label="Onda de Luz e Diálogo">
+                        <span class="touch-icon">✨</span>
+                        <span class="touch-label">LUZ [E]</span>
+                    </button>
+                    <button id="touch-btn-bunny" class="touch-btn touch-btn-action ability-bunny" type="button" aria-label="Comando do Coelho">
+                        <span class="touch-icon">🐰</span>
+                        <span class="touch-label">COELHO [F]</span>
+                    </button>
+                </div>
+                <button id="touch-btn-jump" class="touch-btn touch-btn-jump" type="button" aria-label="Pular">
+                    <span class="touch-icon">⬆</span>
+                    <span class="touch-label">PULAR</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts do Jogo -->
+    <script src="js/audio.js"></script>
+    <script src="js/sprites.js"></script>
+    <script src="js/particles.js"></script>
+    <script src="js/levels.js"></script>
+    <script src="js/achievements.js"></script>
+    <script src="js/game.js"></script>
+</body>
+</html>
