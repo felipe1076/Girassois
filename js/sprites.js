@@ -13,6 +13,11 @@ class SpriteManager {
         this.assetManifest = {
             // Personagem — animações principais
             'player_idle': 'assets/personagem/idle.PNG',
+            'remo_1': 'assets/personagem/remo_1.png',
+            'remo_2': 'assets/personagem/remo_2.png',
+            'remo_3': 'assets/personagem/remo_3.png',
+            'remo_4': 'assets/personagem/remo_4.png',
+            'remo_5': 'assets/personagem/remo_5.png',
             'player_idle_front1': 'assets/personagem/parado de frente 1.png',
             'player_idle_front2': 'assets/personagem/parado de frente 2.png',
             'player_idle_front3': 'assets/personagem/parado de frente 3.png',
@@ -71,23 +76,21 @@ class SpriteManager {
             'player_fall':        'assets/personagem/fall.PNG',
 
             // Coelho de Apoio Emocional
-            'bunny_idle':       'assets/animais/coelho 1.png',
-            'bunny_walk1':      'assets/animais/coelho 1.png',
-            'bunny_walk2':      'assets/animais/coelho 2.png',
-            'bunny_walk3':      'assets/animais/coelho 3.png',
-            'bunny_walk4':      'assets/animais/coelho 4.png',
-            'bunny_walk5':      'assets/animais/coelho 5.png',
-            'bunny_walk6':      'assets/animais/coelho 6.png',
-            'bunny_front1':     'assets/animais/coelho 1.png',
-            'bunny_front2':     'assets/animais/coelho 2.png',
-            'bunny_front3':     'assets/animais/coelho 3.png',
-            'bunny_front4':     'assets/animais/coelho 4.png',
-            'bunny_front5':     'assets/animais/coelho 5.png',
-            'bunny_front6':     'assets/animais/coelho 6.png',
-            'bunny_jump2':      'assets/animais/coelho 2.png',
-            'bunny_jump3':      'assets/animais/coelho 3.png',
-            'bunny_jump_front': 'assets/animais/coelho 2.png',
-            'bunny_jump_back':  'assets/animais/coelho 2.png',
+            'bunny_idle':       'assets/animais/parado_1.png',
+            'bunny_idle1':      'assets/animais/parado_1.png',
+            'bunny_idle2':      'assets/animais/parado_2.png',
+            'bunny_idle3':      'assets/animais/parado_3.png',
+            'bunny_walk1':      'assets/animais/frente_1.png',
+            'bunny_walk2':      'assets/animais/frente_2.png',
+            'bunny_walk3':      'assets/animais/frente_3.png',
+            'bunny_front1':     'assets/animais/parado_1.png',
+            'bunny_front2':     'assets/animais/parado_2.png',
+            'bunny_front3':     'assets/animais/parado_3.png',
+            'bunny_jump1':      'assets/animais/pulo_1.png',
+            'bunny_jump2':      'assets/animais/pulo_2.png',
+            'bunny_jump3':      'assets/animais/pulo_3.png',
+            'bunny_jump_front': 'assets/animais/pulo_2.png',
+            'bunny_jump_back':  'assets/animais/pulo_2.png',
             'bunny_eating':     'assets/animais/comendo.PNG',
 
             // Boss Final (Spritesheet Cuphead)
@@ -103,6 +106,14 @@ class SpriteManager {
             'boss_golpe_2': 'assets/inimigos/golpe boss 2.png',
             'boss_golpe_3': 'assets/inimigos/golpe boss 3.png',
             'boss_golpe_4': 'assets/inimigos/golpe boss 4.png',
+            'narciso_perfil_1': 'assets/inimigos/narci_perfil_1.png',
+            'narciso_perfil_2': 'assets/inimigos/narci_perfil_2.png',
+            'narciso_perfil_3': 'assets/inimigos/narci_perfil_3.png',
+            'narciso_perfil_4': 'assets/inimigos/narci_perfil_4.png',
+            'narciso_perfil_5': 'assets/inimigos/narci_perfil_5.png',
+            'narciso_perfil_6': 'assets/inimigos/narci_perfil_6.png',
+            'narciso_dano_1': 'assets/inimigos/narciso_dano_1.png',
+            'narciso_dano_2': 'assets/inimigos/narciso_dano_2.png',
 
             // Inimigos / Sintomas dos Transtornos
             'obs_isolamento':  'assets/inimigos/isolamento.png',
@@ -110,6 +121,9 @@ class SpriteManager {
             'obs_controlador': 'assets/inimigos/controlador.png',
             'obs_financeiro':  'assets/inimigos/financeiro.png',
             'obs_abusador':    'assets/inimigos/abusador.png',
+            'obs_fantasma_tristeza_1': 'assets/inimigos/fantasma_tristeza_1.png',
+            'obs_fantasma_tristeza_2': 'assets/inimigos/fantasma_tristeza_2.png',
+            'obs_fantasma_tristeza_3': 'assets/inimigos/fantasma_tristeza_3.png',
             'obs_boss_ciclo':  'assets/inimigos/boss_ciclo.png',
             'runner_obstacle1': 'assets/inimigos/obstaculos 1.png',
             'runner_obstacle2': 'assets/inimigos/obstaculos 2.png',
@@ -120,6 +134,14 @@ class SpriteManager {
             'runner_obstacle7': 'assets/inimigos/obstaculos 7.png',
             'runner_obstacle8': 'assets/inimigos/obstaculos 8.png',
             'runner_obstacle9': 'assets/inimigos/obstaculos 9.png',
+            'sombra_1': 'assets/inimigos/sombra1.png',
+            'sombra_2': 'assets/inimigos/sombra2.png',
+            'sombra_3': 'assets/inimigos/sombra3.png',
+            'sombra_4': 'assets/inimigos/sombra4.png',
+            'sombra_5': 'assets/inimigos/sombra5.png',
+            'sombra_6': 'assets/inimigos/sombra6.png',
+            'sombra_7': 'assets/inimigos/sombra7.png',
+            'sombra_8': 'assets/inimigos/sombra8.png',
 
             // Itens de Empatia e Apoio
             'item_coracao':      'assets/itens/hud_coracao.png',
@@ -133,6 +155,8 @@ class SpriteManager {
             'item_certidao':     'assets/itens/certidao.png',
             'item_documento_rg': 'assets/itens/documento_rg.png',
             'item_denuncia':     'assets/itens/denuncia.png',
+            'portal_fechado':    'assets/itens/porta_fechada.png',
+            'portal_aberto':     'assets/itens/porta_aberta.png',
 
             // Cenários das Fases (novos — 7 fundos)
             'bg_fase1': 'assets/cenarios/fase 1.png',
@@ -140,12 +164,27 @@ class SpriteManager {
             'bg_fase3': 'assets/cenarios/fase 3.jfif',
             'bg_fase4': 'assets/cenarios/fase 4.jfif',
             'bg_fase5': 'assets/cenarios/fase 5.jfif',
-            'bg_fase6': 'assets/cenarios/fase 6.jpg',
-            'bg_fase7': 'assets/cenarios/fase 7.jfif',
+            'bg_fase6': 'assets/cenarios/fase 6.png',
+            'bg_fase7': 'assets/cenarios/fase 7.png',
+
+            // Cutscenes
+            'cutscene_fase1_1': 'assets/cutscenes/fase1_1.png',
+            'cutscene_fase1_2': 'assets/cutscenes/fase1_2.png',
+            'cutscene_fase1_3': 'assets/cutscenes/fase1_3.png',
+            'cutscene_fase3_1': 'assets/cutscenes/fase3_1.png',
+            'cutscene_fase4_1': 'assets/cutscenes/fase4_1.png',
+            'cutscene_fase5_1': 'assets/cutscenes/fase5_1.png',
+            'cutscene_fase6_1': 'assets/cutscenes/fase6_1.png',
+            'cutscene_fase9_1': 'assets/cutscenes/fase9_1.png',
+            'cutscene_ending_1': 'assets/cutscenes/ending_1.png',
+            'cutscene_ending_2': 'assets/cutscenes/ending_2.png',
 
             // Terreno e Plataformas
             'terreno':    'assets/terreno/chao.png',
-            'plataformas':'assets/terreno/plataformas.png'
+            'plataformas':'assets/terreno/plataformas.png',
+            'surf_water': 'assets/terreno/mar_textura.png.png',
+            'lago_agua':  'assets/terreno/lago_agua.png',
+            'lago_ceu':   'assets/terreno/lago_ceu.png'
         };
     }
 

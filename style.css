@@ -58,6 +58,36 @@ canvas {
     justify-content: space-between;
 }
 
+.cutscene-skip {
+    position: absolute;
+    top: 18px;
+    right: 20px;
+    z-index: 60;
+    padding: 9px 14px;
+    border: 1px solid rgba(245, 241, 255, 0.35);
+    border-radius: 6px;
+    background: rgba(35, 30, 49, 0.9);
+    color: #f5f1ff;
+    font: 600 14px 'Segoe UI', Tahoma, sans-serif;
+    cursor: pointer;
+    pointer-events: auto;
+}
+
+.cutscene-skip:hover {
+    background: rgba(62, 52, 82, 0.96);
+}
+
+#game-container.cutscene-active .hud-top,
+#game-container.cutscene-active #touch-controls-layer {
+    display: none !important;
+}
+
+#game-container.credits-active .hud-top,
+#game-container.credits-active #touch-controls-layer,
+#game-container.credits-active #btn-cutscene-skip {
+    display: none !important;
+}
+
 /* Top HUD */
 .hud-top {
     display: flex;
@@ -218,6 +248,16 @@ canvas {
     border-color: #ff80ab;
 }
 
+.shield-btn {
+    background: linear-gradient(135deg, rgba(79, 195, 247, 0.25), rgba(3, 169, 244, 0.4));
+    border-color: #80d8ff;
+    box-shadow: 0 2px 8px rgba(79, 195, 247, 0.3);
+}
+
+.shield-btn:hover {
+    background: #80d8ff;
+}
+
 .cooldown-overlay {
     position: absolute;
     top: 0;
@@ -322,6 +362,8 @@ canvas {
     align-items: center;
     padding: 30px;
     text-align: center;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     pointer-events: auto;
     z-index: 20;
     transition: opacity 0.3s ease;
@@ -329,6 +371,169 @@ canvas {
 
 .modal-screen.hidden {
     display: none;
+}
+
+#modal-start {
+    isolation: isolate;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: clamp(18px, 4vh, 42px) 20px;
+    background: transparent;
+    backdrop-filter: none;
+}
+
+#modal-start::before {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background: linear-gradient(135deg, rgba(5, 12, 21, 0.78), rgba(13, 22, 36, 0.54) 55%, rgba(4, 13, 22, 0.76));
+    content: "";
+    pointer-events: none;
+}
+
+.menu-video-background {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    width: 100vw;
+    height: 100vh;
+    object-fit: cover;
+    pointer-events: none;
+}
+
+#game-container:has(#modal-start:not(.hidden)) .hud-top {
+    visibility: hidden;
+}
+
+.start-menu-content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    width: min(760px, 100%);
+    flex-direction: column;
+    align-items: center;
+}
+
+.start-menu-footer {
+    position: absolute;
+    right: 16px;
+    bottom: clamp(8px, 1.8vh, 16px);
+    left: 16px;
+    z-index: 1;
+    max-width: none !important;
+    margin: 0 !important;
+    color: rgba(255, 255, 255, 0.88) !important;
+    font-size: clamp(10px, 1vw, 12px) !important;
+    line-height: 1.4 !important;
+    text-align: center;
+    text-shadow: 0 1px 5px rgba(0, 0, 0, 0.95);
+    pointer-events: none;
+}
+
+#modal-start .start-menu-content h1 {
+    margin: 0 0 8px;
+    color: #fff5b8;
+    font-size: clamp(30px, 5vw, 56px);
+    line-height: 1.12;
+    text-shadow: 0 3px 20px rgba(255, 190, 40, 0.42), 0 4px 18px rgba(0, 0, 0, 0.78);
+}
+
+#modal-start .start-menu-content h2 {
+    margin: 0 0 12px;
+    color: #f2f6ff;
+    font-size: clamp(16px, 2.2vw, 22px);
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.9);
+}
+
+#modal-start .mode-select-box {
+    width: auto;
+    margin: 8px 0 22px;
+}
+
+#modal-start .mode-select-buttons {
+    gap: 10px;
+}
+
+#modal-start .btn-mode-choice {
+    min-width: 185px;
+    padding: 10px 18px;
+    border-color: rgba(255, 255, 255, 0.32) !important;
+    background: rgba(11, 21, 34, 0.72) !important;
+    backdrop-filter: blur(8px);
+}
+
+#modal-start .btn-mode-choice.active {
+    border-color: #ffe276 !important;
+    background: rgba(93, 72, 20, 0.72) !important;
+}
+
+.start-menu-actions {
+    display: flex;
+    width: min(560px, 100%);
+    flex-direction: column;
+    gap: 14px;
+}
+
+#modal-start .btn-primary {
+    min-height: 54px;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    background: linear-gradient(135deg, rgba(255, 222, 94, 0.98), rgba(255, 157, 42, 0.98));
+    box-shadow: 0 9px 28px rgba(0, 0, 0, 0.36), 0 0 24px rgba(255, 197, 55, 0.24);
+    font-size: 15px;
+    letter-spacing: 0.045em;
+}
+
+#modal-start .start-play-button {
+    min-height: 76px;
+    border: 1px solid rgba(255, 247, 204, 0.9);
+    border-radius: 18px;
+    font-size: clamp(22px, 3.2vw, 30px);
+    letter-spacing: 0.12em;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.4), 0 0 36px rgba(255, 197, 55, 0.34);
+}
+
+.start-secondary-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+#modal-start .start-secondary-actions .btn-primary {
+    color: #f5f7ff;
+    background: rgba(12, 25, 40, 0.78);
+    backdrop-filter: blur(8px);
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.32);
+}
+
+#modal-start .start-secondary-actions .btn-primary:hover {
+    background: rgba(29, 48, 69, 0.92);
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.42);
+}
+
+#modal-start .start-controls-hint {
+    margin: 20px 0 0;
+    padding: 9px 16px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(7, 15, 25, 0.56);
+    backdrop-filter: blur(6px);
+    color: #f3f6fb;
+    font-size: 13px;
+    text-shadow: 0 1px 5px rgba(0, 0, 0, 0.8);
+}
+
+#modal-start .start-controls-hint span {
+    padding: 0 5px;
+    color: #ffe276;
+}
+
+#modal-start .start-change-group {
+    margin-top: 12px;
+    padding: 6px 12px;
+    border-color: rgba(255, 255, 255, 0.16);
+    color: rgba(255, 255, 255, 0.78);
+    font-size: 12px;
 }
 
 .modal-screen h1 {
@@ -395,6 +600,322 @@ canvas {
 
 .btn-primary:active {
     transform: translateY(1px) scale(0.98);
+}
+
+.btn-subtle {
+    background: transparent;
+    color: #f8fafc;
+    border: 1px solid rgba(255,255,255,0.28);
+    border-radius: 999px;
+    padding: 10px 18px;
+    font: inherit;
+    cursor: pointer;
+}
+
+.btn-subtle:hover {
+    background: rgba(255,255,255,0.1);
+}
+
+.group-setup-form {
+    width: min(420px, 100%);
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    text-align: left;
+}
+
+.group-setup-form label {
+    color: #ffe066;
+    font-weight: 700;
+    margin-top: 8px;
+}
+
+.group-setup-form input,
+.ranking-filter select {
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 12px;
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 8px;
+    background: #172b3c;
+    color: #fff;
+    font: inherit;
+}
+
+.group-setup-form input:focus,
+.ranking-filter select:focus {
+    outline: 2px solid #ffd700;
+    outline-offset: 2px;
+}
+
+.form-error {
+    min-height: 22px;
+    margin: 2px 0 !important;
+    color: #ffb4a2 !important;
+}
+
+.group-setup-actions {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+}
+
+.ranking-panel {
+    width: min(760px, 90vw);
+    background: rgba(15, 23, 42, 0.92);
+    border: 1px solid rgba(255, 204, 0, 0.5);
+    border-radius: 18px;
+    padding: 24px 20px 18px;
+    box-shadow: 0 12px 28px rgba(0,0,0,0.45);
+}
+
+.credits-screen {
+    position: absolute;
+    inset: 0;
+    z-index: 70;
+    overflow: hidden;
+    color: #fff8dc;
+    background:
+        radial-gradient(ellipse at 50% 35%, rgba(69, 53, 86, 0.72), rgba(8, 13, 24, 0.96) 72%),
+        rgba(8, 13, 24, 0.94);
+}
+
+.credits-screen.hidden {
+    display: none;
+}
+
+.credits-viewport {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    mask-image: linear-gradient(to bottom, transparent, #000 10%, #000 90%, transparent);
+}
+
+.credits-roll {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: min(760px, calc(100% - 36px));
+    padding: 0 0 40vh;
+    text-align: center;
+    transform: translate(-50%, 100vh);
+    animation: credits-scroll 58s linear forwards;
+}
+
+.credits-roll > h1 {
+    margin: 0 0 34px;
+    color: #ffe082;
+    font-size: clamp(34px, 6vw, 56px);
+    letter-spacing: 0.12em;
+    text-shadow: 0 0 22px rgba(255, 215, 0, 0.4);
+}
+
+.credits-section {
+    margin: 0 0 38px;
+}
+
+.credits-section > h2 {
+    margin: 0 0 22px;
+    color: #ffd54f;
+    font-size: clamp(22px, 3.5vw, 30px);
+    letter-spacing: 0.08em;
+}
+
+.credits-class {
+    margin: 0 auto 25px;
+}
+
+.credits-class h3 {
+    margin: 0 0 10px;
+    color: #9fe8ff;
+    font-size: clamp(18px, 2.8vw, 22px);
+}
+
+.credits-class p {
+    max-width: none;
+    margin: 0 auto 7px;
+    padding: 0 4px;
+    color: #fff8ec;
+    font-size: clamp(15px, 2.3vw, 19px);
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+    text-shadow: 0 2px 7px rgba(0, 0, 0, 0.8);
+}
+
+.credits-continue {
+    position: absolute;
+    top: 18px;
+    right: 20px;
+    z-index: 2;
+    min-width: 140px;
+}
+
+@keyframes credits-scroll {
+    from { transform: translate(-50%, 100vh); }
+    to { transform: translate(-50%, -100%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .credits-roll {
+        position: relative;
+        top: 50%;
+        left: 50%;
+        max-height: calc(100vh - 100px);
+        padding: 24px 0;
+        overflow-y: auto;
+        animation: none;
+        transform: translate(-50%, -50%);
+    }
+}
+
+.ranking-filter {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 10px;
+    margin: 16px 0;
+}
+
+.ranking-filter label {
+    color: #f8fafc;
+    font-weight: 700;
+}
+
+.ranking-filter select {
+    width: min(260px, 65vw);
+    min-height: 40px;
+    padding: 7px 10px;
+}
+
+.ranking-list {
+    min-height: 220px;
+    max-height: 360px;
+    overflow: auto;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.04);
+    padding: 8px;
+    overflow-x: auto;
+}
+
+.ranking-row {
+    display: grid;
+    grid-template-columns: 110px minmax(75px, 0.8fr) minmax(130px, 1.5fr) 100px 90px;
+    min-width: 560px;
+    gap: 10px;
+    align-items: center;
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    color: #e2e8f0;
+    font-size: 14px;
+}
+
+.ranking-row.header {
+    font-weight: 700;
+    color: #ffd700;
+    background: rgba(255,204,0,0.08);
+    border-radius: 8px;
+}
+
+.ranking-empty {
+    color: #e2e8f0;
+    text-align: center;
+    padding: 24px 8px;
+}
+
+.victory-ranking-summary {
+    width: min(520px, 100%);
+    margin: 4px 0 18px;
+    padding: 14px 18px;
+    border: 1px solid rgba(255,204,0,0.35);
+    border-radius: 10px;
+    background: rgba(255,255,255,0.06);
+    color: #f8fafc;
+    text-align: left;
+}
+
+.victory-ranking-summary h3 {
+    margin: 0 0 10px;
+    color: #ffe066;
+    text-align: center;
+}
+
+.victory-ranking-summary div {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 5px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.victory-ranking-summary div:last-child {
+    border-bottom: 0;
+}
+
+.ranking-actions {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 18px;
+}
+
+.ranking-bonus-list {
+    width: min(700px, 100%);
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,204,0,0.3);
+    border-radius: 12px;
+    padding: 10px 14px;
+    margin: 10px 0 16px;
+    text-align: left;
+    color: #f8fafc;
+}
+
+.ranking-bonus-list div {
+    padding: 5px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.ranking-bonus-list div:last-child {
+    border-bottom: none;
+}
+
+.ranking-save-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin: 12px 0 18px;
+}
+
+.ranking-save-row input {
+    min-width: 200px;
+    max-width: 280px;
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.2);
+    background: rgba(15, 23, 42, 0.55);
+    color: #fff;
+    outline: none;
+}
+
+#level-select-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 14px;
+    width: min(720px, 100%);
+    margin: 12px 0 24px;
+}
+
+.level-select-button {
+    min-height: 64px;
+    width: 100%;
+    font-family: inherit;
+    font-size: 15px;
 }
 
 /* Victory Helpline Box */
@@ -607,6 +1128,7 @@ canvas {
 
 /* Estilo Base dos Botões Touch */
 .touch-btn {
+    position: relative;
     pointer-events: auto;
     touch-action: none;
     user-select: none;
@@ -677,6 +1199,17 @@ canvas {
     line-height: 1.1;
 }
 
+.ability-shield {
+    border-color: rgba(128, 216, 255, 0.85);
+    color: #dff7ff;
+}
+
+.ability-shield:active,
+.ability-shield.pressed {
+    background: linear-gradient(145deg, rgba(79, 195, 247, 0.4), rgba(3, 169, 244, 0.55));
+    border-color: #80d8ff;
+}
+
 .touch-btn-action .touch-label {
     font-size: 9px;
     font-weight: 800;
@@ -726,6 +1259,38 @@ canvas {
 
 /* Responsividade adicional para telas menores/tablets */
 @media (max-width: 820px) {
+    #modal-start {
+        padding: 18px 14px;
+    }
+    #modal-start .mode-select-box {
+        margin-bottom: 16px;
+    }
+    #modal-start .mode-select-buttons {
+        max-width: 430px;
+    }
+    #modal-start .btn-mode-choice {
+        min-width: 0;
+        padding: 9px 12px;
+    }
+    .start-menu-actions {
+        width: min(520px, 100%);
+    }
+    #modal-start .start-play-button {
+        min-height: 68px;
+    }
+    .start-secondary-actions {
+        gap: 10px;
+    }
+    #modal-start .btn-primary {
+        padding: 11px 16px;
+        font-size: 13px;
+    }
+    #modal-start .start-controls-hint {
+        gap: 5px;
+        margin-top: 15px;
+        padding: 8px 11px;
+        font-size: 11px;
+    }
     #game-container.surf-active .hud-left {
         flex-wrap: nowrap;
         gap: 4px;
@@ -780,4 +1345,26 @@ canvas {
     }
 }
 
-
+@media (max-width: 520px) {
+    #modal-start .mode-select-buttons {
+        width: 100%;
+    }
+    #modal-start .btn-mode-choice {
+        gap: 6px;
+        padding: 8px 6px;
+    }
+    #modal-start .mode-icon {
+        font-size: 19px;
+    }
+    .start-secondary-actions {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+    #modal-start .start-secondary-actions .btn-primary {
+        min-height: 46px;
+    }
+    #modal-start .start-controls-hint {
+        flex-wrap: wrap;
+        line-height: 1.6;
+    }
+}

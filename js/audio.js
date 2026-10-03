@@ -9,6 +9,23 @@ class AudioManager {
         this.bgmTimer = null;
         this.bgmStep = 0;
         this.isBgmPlaying = false;
+        this.musicMode = 'procedural';
+        this.musicTrack = new Audio('assets/sons/Beneath_the_Ancient_Boughs.mp3');
+        this.musicTrack.loop = true;
+        this.musicTrack.volume = 0.55;
+        this.musicRunner = new Audio('assets/sons/Gallop_Toward_the_Podium.mp3');
+        this.musicRunner.loop = true;
+        this.musicRunner.volume = 0.55;
+        this.musicCutsceneIntro = new Audio('assets/sons/inicio.mp3');
+        this.musicCutsceneMid = new Audio('assets/sons/durante o resto.mp3');
+        this.musicCutsceneEnd = new Audio('assets/sons/final.mp3');
+        this.musicCutsceneIntro.loop = true;
+        this.musicCutsceneMid.loop = true;
+        this.musicCutsceneEnd.loop = false;
+        this.musicCutsceneIntro.volume = 0.55;
+        this.musicCutsceneMid.volume = 0.55;
+        this.musicCutsceneEnd.volume = 0.55;
+        this.activeCutsceneMusic = null;
     }
 
     init() {
@@ -21,8 +38,17 @@ class AudioManager {
         if (this.ctx && this.ctx.state === 'suspended') {
             this.ctx.resume();
         }
-        if (!this.isBgmPlaying && !this.isMuted) {
-            this.startBgm();
+        if (!this.isMuted) {
+            if (this.activeCutsceneMusic) {
+                const playback = this.activeCutsceneMusic.play();
+                if (playback && typeof playback.catch === 'function') playback.catch(() => {});
+            } else if (this.musicMode === 'track') {
+                this.playMusicTrack();
+            } else if (this.musicMode === 'runner') {
+                this.playMusicRunner();
+            } else if (!this.isBgmPlaying) {
+                this.startBgm();
+            }
         }
     }
 
@@ -30,14 +56,108 @@ class AudioManager {
         this.isMuted = !this.isMuted;
         if (this.isMuted) {
             this.stopBgm();
+            this.musicTrack.pause();
+            this.musicRunner.pause();
+            this.getCutsceneMusicTracks().forEach(track => track.pause());
         } else {
-            this.startBgm();
+            this.init();
         }
         return this.isMuted;
     }
 
+    setLevelMusic(levelId) {
+        const nextMode = levelId === 3 ? 'runner' : 'track';
+        if (nextMode === this.musicMode) {
+            if (this.isMuted) return;
+            if (nextMode === 'track') {
+                this.playMusicTrack();
+            } else if (nextMode === 'runner') {
+                this.playMusicRunner();
+            } else if (!this.isBgmPlaying) {
+                this.startBgm();
+            }
+            return;
+        }
+
+        this.stopBgm();
+        this.musicTrack.pause();
+        this.musicRunner.pause();
+        if (nextMode === 'track') this.musicTrack.currentTime = 0;
+        if (nextMode === 'runner') this.musicRunner.currentTime = 0;
+        this.musicMode = nextMode;
+
+        if (this.isMuted) return;
+        if (nextMode === 'track') {
+            this.playMusicTrack();
+        } else if (nextMode === 'runner') {
+            this.playMusicRunner();
+        } else {
+            this.startBgm();
+        }
+    }
+
+    playMusicTrack() {
+        if (this.isMuted || !this.musicTrack.paused) return;
+        const playback = this.musicTrack.play();
+        if (playback && typeof playback.catch === 'function') {
+            playback.catch(() => {
+                if (this.musicMode === 'track' && !this.isMuted) {
+                    this.musicMode = 'procedural';
+                    this.startBgm();
+                }
+            });
+        }
+    }
+
+    playMusicRunner() {
+        if (this.isMuted || !this.musicRunner.paused) return;
+        const playback = this.musicRunner.play();
+        if (playback && typeof playback.catch === 'function') {
+            playback.catch(() => {
+                if (this.musicMode === 'runner' && !this.isMuted) {
+                    this.musicMode = 'procedural';
+                    this.startBgm();
+                }
+            });
+        }
+    }
+
+    getCutsceneMusicTracks() {
+        return [this.musicCutsceneIntro, this.musicCutsceneMid, this.musicCutsceneEnd];
+    }
+
+    playCutsceneMusic(type) {
+        this.init();
+        const tracks = {
+            intro: this.musicCutsceneIntro,
+            mid: this.musicCutsceneMid,
+            end: this.musicCutsceneEnd
+        };
+        const track = tracks[type];
+        if (!track || this.isMuted) return;
+
+        this.stopBgm();
+        this.musicTrack.pause();
+        this.musicRunner.pause();
+        this.getCutsceneMusicTracks().forEach(cutsceneTrack => cutsceneTrack.pause());
+        track.currentTime = 0;
+        this.activeCutsceneMusic = track;
+        const playback = track.play();
+        if (playback && typeof playback.catch === 'function') {
+            playback.catch(error => console.warn('Cutscene music blocked:', error));
+        }
+    }
+
+    stopCutsceneMusic() {
+        this.getCutsceneMusicTracks().forEach(track => {
+            track.pause();
+            track.currentTime = 0;
+        });
+        this.activeCutsceneMusic = null;
+    }
+
     startBgm() {
-        if (this.isMuted || this.isBgmPlaying) return;
+        if (this.isMuted || this.isBgmPlaying || this.musicMode === 'track' || this.musicMode === 'runner') return;
         this.isBgmPlaying = true;
         this.scheduleBgmLoop();
     }

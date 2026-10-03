@@ -5,7 +5,7 @@ const BOSS_FLAME_SCALE = 0.04;
 
 /**
  * Game - Loop principal, física, colisões, estados e HUD do jogo Setembro Amarelo
- * Suporta 6 Fases com Puzzles Cooperativos (Coelho no botão) e Plataformas de Luz Reveláveis.
+ * Suporta 9 fases com mini-games, puzzles cooperativos e chefes.
  */
 class Game {
     constructor() {
@@ -17,9 +17,12 @@ class Game {
         this.canvas.height = 540;
 
         // Estado do Jogo
-        this.state = 'START'; // 'START', 'PLAYING', 'LEVEL_COMPLETE', 'GAME_OVER', 'VICTORY'
+        this.state = 'START'; // 'START', 'CUTSCENE', 'PLAYING', 'LEVEL_COMPLETE', 'GAME_OVER', 'VICTORY'
         this.currentLevelIndex = 0;
         this.currentLevel = null;
+        this.isEndingCutscene = false;
+        this.endingCutscenePlayed = false;
+        this.creditsReturnToLevelSelect = false;
         this.score = 0;
         this.cameraX = 0;
         this.hope = 20;
@@ -27,11 +30,15 @@ class Game {
         this.empathy = Number(localStorage.getItem('empathy')) || 0;
         this.fragmentsCollected = 0;
         this.choiceLog = [];
-        this.npcs = [];
+        this.frameDeltaMs = 16.666;
 
         // Habilidade Onda de Luz
         this.waveCooldown = 0;
         this.maxWaveCooldown = 2.2;
+        this.shieldTimer = 0;
+        this.shieldCooldown = 0;
+        this.maxShieldDuration = 1.2;
+        this.maxShieldCooldown = 8;
         this.phase1LightPulse = 0;
         this.phase1DarkTimer = 0;
 
@@ -67,7 +74,11 @@ class Game {
         this.surfObstacles = [];
         this.surfPlayerX = 480;
         this.surfPlayerVelocity = 0;
+        this.surfRowFrame = 1;
+        this.surfRowFrameTimer = 0;
         this.surfWaveOffset = 0;
+        this.surfBgScrollSpeed = 1.15;
+        this.surfBoardTilt = 0;
 
         // Jogador (Velocidade e física calibradas)
         this.player = {
@@ -87,8 +98,8 @@ class Game {
             landingTimer: 0,
             isCrouching: false,
             facing: 1,
-            hearts: 3,
-            maxHearts: 3,
+            hearts: 5,
+            maxHearts: 5,
             isInvulnerable: false,
             invulnerableTimer: 0,
             isAttacking: false,
@@ -105,12 +116,15 @@ class Game {
             vy: 0,
             facing: 1,
             isGrounded: false,
+            jumpCooldown: 0,
+            reachAttempted: false,
             eatTimer: 0,
             isWaiting: false // Tecla F: Ficar sentado no botão ou Seguir
         };
 
         // Entidades da fase atual
         this.platforms = [];
+        this.dynamicPlatforms = [];
         this.obstacles = [];
         this.items = [];
 
@@ -118,6 +132,7 @@ class Game {
         this.keys = {
             left: false,
             right: false,
+            up: false,
             down: false,
             jump: false,
             jumpPressed: false
@@ -136,8 +151,17 @@ class Game {
 
     initControls() {
         window.addEventListener('keydown', (e) => {
+            if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target?.tagName)) return;
             const code = e.code;
             const key = e.key;
+
+            if (this.state === 'CUTSCENE') {
+                if (!e.repeat && (code === 'Space' || key === ' ' || code === 'Enter' || key === 'Enter')) {
+                    e.preventDefault();
+                    this.advanceCutscene();
+                }
+                return;
+            }
 
             if (code === 'ArrowLeft' || key === 'ArrowLeft' || code === 'KeyA' || key === 'a' || key === 'A') {
                 this.keys.left = true;
@@ -148,7 +172,9 @@ class Game {
             if (code === 'ArrowDown' || key === 'ArrowDown' || code === 'KeyS' || key === 's' || key === 'S') {
                 this.keys.down = true;
             }
-            if (code === 'ArrowUp' || key === 'ArrowUp' || code === 'KeyW' || key === 'w' || key === 'W' || code === 'Space' || key === ' ') {
+            const upKey = code === 'ArrowUp' || key === 'ArrowUp' || code === 'KeyW' || key === 'w' || key === 'W';
+            const jumpKey = code === 'Space' || key === ' ';
+            if (upKey || jumpKey) {
                 if (!this.keys.jumpPressed) {
                     this.keys.jump = true;
                     this.keys.jumpPressed = true;
@@ -157,6 +183,9 @@ class Game {
             // Habilidade Onda de Luz (E ou J)
             if (code === 'KeyE' || key === 'e' || key === 'E' || code === 'KeyJ' || key === 'j' || key === 'J') {
                 this.triggerLightWave();
+            }
+            if ((code === 'KeyC' || key === 'c' || key === 'C') && !e.repeat) {
+                this.activateShield();
             }
             // Comando do Coelho (F ou Q)
             if (code === 'KeyF' || key === 'f' || key === 'F' || code === 'KeyQ' || key === 'q' || key === 'Q') {
@@ -169,6 +198,7 @@ class Game {
         });
 
         window.addEventListener('keyup', (e) => {
+            if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target?.tagName)) return;
             const code = e.code;
             const key = e.key;
 
@@ -181,11 +211,23 @@ class Game {
             if (code === 'ArrowDown' || key === 'ArrowDown' || code === 'KeyS' || key === 's' || key === 'S') {
                 this.keys.down = false;
             }
+            if (code === 'ArrowUp' || key === 'ArrowUp' || code === 'KeyW' || key === 'w' || key === 'W') {
+                this.keys.up = false;
+            }
             if (code === 'ArrowUp' || key === 'ArrowUp' || code === 'KeyW' || key === 'w' || key === 'W' || code === 'Space' || key === ' ') {
                 this.keys.jump = false;
                 this.keys.jumpPressed = false;
             }
         });
+
+        this.canvas.addEventListener('click', () => {
+            if (this.state === 'CUTSCENE') this.advanceCutscene();
+        });
+        this.canvas.addEventListener('touchstart', (e) => {
+            if (this.state !== 'CUTSCENE') return;
+            if (e.cancelable) e.preventDefault();
+            this.advanceCutscene();
+        }, { passive: false });
     }
 
     getInitialControlMode() {
@@ -209,9 +251,9 @@ class Game {
         const hintPc = document.getElementById('hint-pc');
         const hintTab = document.getElementById('hint-tablet');
         const btnToggle = document.getElementById('btn-mode-toggle');
+        if (touchLayer) touchLayer.classList.toggle('hidden', this.controlMode !== 'tablet');
 
         if (this.controlMode === 'tablet') {
-            if (touchLayer) touchLayer.classList.remove('hidden');
             if (btnPc) btnPc.classList.remove('active');
             if (btnTab) btnTab.classList.add('active');
             if (hintPc) hintPc.classList.add('hidden');
@@ -221,7 +263,6 @@ class Game {
                 btnToggle.title = 'Modo Tablet ativo. Toque para alternar para Teclado (PC)';
             }
         } else {
-            if (touchLayer) touchLayer.classList.add('hidden');
             if (btnPc) btnPc.classList.add('active');
             if (btnTab) btnTab.classList.remove('active');
             if (hintPc) hintPc.classList.remove('hidden');
@@ -247,6 +288,7 @@ class Game {
             if (!btn) return;
 
             const handlePress = (e) => {
+                if (this.state === 'CUTSCENE') return;
                 if (e.cancelable) e.preventDefault();
                 btn.classList.add('pressed');
                 if (onPress) onPress();
@@ -301,6 +343,13 @@ class Game {
             null
         );
 
+        bindButton('touch-btn-shield',
+            () => {
+                this.activateShield();
+            },
+            null
+        );
+
         // Comando do Coelho
         bindButton('touch-btn-bunny',
             () => {
@@ -308,6 +357,7 @@ class Game {
             },
             null
         );
+
     }
 
     bindUiEvents() {
@@ -331,9 +381,65 @@ class Game {
         });
 
         addClick('btn-start', () => {
-            try { audio.init(); } catch (e) { console.warn(e); }
-            if (typeof achievements !== 'undefined') achievements.unlock('first_step');
-            this.startLevel(0);
+            this.openGroupSetup();
+        });
+
+        const groupForm = document.getElementById('group-setup-form');
+        if (groupForm) groupForm.addEventListener('submit', (event) => {
+            event.preventDefault();
+            this.startFullJourney();
+        });
+
+        addClick('btn-cancel-group-setup', () => {
+            this.hideAllModals();
+            document.getElementById('modal-start').classList.remove('hidden');
+        });
+
+        addClick('btn-change-group', () => {
+            if (window.ranking) window.ranking.clearGroup();
+            this.openGroupSetup();
+        });
+
+        addClick('btn-open-level-select', () => {
+            this.showLevelSelect();
+        });
+
+        addClick('btn-open-ranking', () => {
+            this.openRankingModal('full');
+        });
+
+        addClick('btn-close-ranking', () => {
+            document.getElementById('modal-ranking').classList.add('hidden');
+            document.getElementById('modal-start').classList.remove('hidden');
+        });
+
+        addClick('btn-export-ranking', () => {
+            this.exportRankingFile();
+        });
+
+        const classFilter = document.getElementById('ranking-class-filter');
+        if (classFilter) classFilter.addEventListener('change', () => this.renderRankingList());
+
+        addClick('btn-next-group', () => {
+            if (window.ranking) window.ranking.clearGroup();
+            this.openGroupSetup();
+        });
+
+        addClick('btn-credits-continue', () => {
+            this.finishCredits();
+        });
+
+        addClick('btn-level-select-credits', () => {
+            this.creditsReturnToLevelSelect = true;
+            this.showCreditsScreen();
+        });
+
+        const creditsRoll = document.getElementById('credits-roll');
+        if (creditsRoll) creditsRoll.addEventListener('animationend', () => this.finishCredits());
+
+        addClick('btn-back-level-select', () => {
+            document.getElementById('modal-level-select').classList.add('hidden');
+            document.getElementById('modal-start').classList.remove('hidden');
         });
 
         addClick('btn-next-level', () => {
@@ -346,33 +452,138 @@ class Game {
             this.startLevel(this.currentLevelIndex);
         });
 
-        addClick('btn-restart-game', () => {
-            try { audio.init(); } catch (e) { console.warn(e); }
-            this.score = 0;
-            this.startLevel(0);
-        });
-
         addClick('btn-sound-toggle', () => {
             this.toggleAudio();
+        });
+
+        addClick('btn-cutscene-skip', () => {
+            this.skipCutscene();
         });
 
         addClick('btn-wave-ability', () => {
             this.triggerLightWave();
         });
 
+        addClick('btn-shield-ability', () => {
+            this.activateShield();
+        });
+
         addClick('btn-bunny-toggle', () => {
             this.toggleBunnyCommand();
         });
 
-        addClick('btn-start-runner', () => {
-            try { audio.init(); } catch (e) { console.warn(e); }
-            this.startLevel(2);
-        });
+    }
 
-        addClick('btn-start-boss', () => {
-            try { audio.init(); } catch (e) { console.warn(e); }
-            this.startLevel(6); // Fase 7 (índice 6)
+    openGroupSetup() {
+        const modal = document.getElementById('modal-group-setup');
+        const groupInput = document.getElementById('group-name-input');
+        const classInput = document.getElementById('group-class-input');
+        const error = document.getElementById('group-setup-error');
+        if (!modal || !groupInput || !classInput) return;
+
+        groupInput.value = '';
+        classInput.value = window.ranking ? window.ranking.getLastTurma() : '';
+        if (error) error.textContent = '';
+        this.hideAllModals();
+        modal.classList.remove('hidden');
+        groupInput.focus();
+    }
+
+    startFullJourney() {
+        const groupInput = document.getElementById('group-name-input');
+        const classInput = document.getElementById('group-class-input');
+        const error = document.getElementById('group-setup-error');
+        const grupo = groupInput.value.trim();
+        const turma = classInput.value.trim();
+        if (!grupo || !turma) {
+            if (error) error.textContent = 'Preencha o nome do grupo e a turma.';
+            (!grupo ? groupInput : classInput).focus();
+            return;
+        }
+        if (!window.ranking || !window.ranking.setGroup(grupo, turma)) {
+            if (error) error.textContent = 'Confira os dados do grupo e da turma.';
+            return;
+        }
+
+        try { audio.init(); } catch (e) { console.warn(e); }
+        if (typeof achievements !== 'undefined') achievements.unlock('first_step');
+        window.ranking.startRun('full');
+        this.score = 0;
+        this.startLevel(0);
+    }
+
+    openRankingModal() {
+        const modal = document.getElementById('modal-ranking');
+        const classFilter = document.getElementById('ranking-class-filter');
+        if (!modal || !classFilter) return;
+
+        this.hideAllModals();
+        modal.classList.remove('hidden');
+        const selected = classFilter.value;
+        classFilter.replaceChildren(new Option('Todas as turmas', ''));
+        (window.ranking ? window.ranking.getTurmas() : []).forEach(turma => {
+            const option = new Option(turma, turma);
+            classFilter.add(option);
         });
+        classFilter.value = [...classFilter.options].some(option => option.value === selected) ? selected : '';
+        this.renderRankingList();
+    }
+
+    renderRankingList() {
+        const list = document.getElementById('ranking-list');
+        const classFilter = document.getElementById('ranking-class-filter');
+        if (!list || !classFilter) return;
+        list.replaceChildren();
+        const entries = window.ranking && typeof window.ranking.getTop === 'function'
+            ? window.ranking.getTop(10, classFilter.value)
+            : [];
+        const columns = ['Posição', 'Turma', 'Grupo', 'Pontos', 'Tempo'];
+        const header = document.createElement('div');
+        header.className = 'ranking-row header';
+        columns.forEach(text => {
+            const cell = document.createElement('span');
+            cell.textContent = text;
+            header.appendChild(cell);
+        });
+        list.appendChild(header);
+
+        if (!entries.length) {
+            const empty = document.createElement('p');
+            empty.className = 'ranking-empty';
+            empty.textContent = 'Nenhum grupo registrado.';
+            list.appendChild(empty);
+            return;
+        }
+
+        entries.forEach((entry, index) => {
+            const row = document.createElement('div');
+            row.className = 'ranking-row';
+            [this.getRankingPlace(index + 1), entry.turma, entry.grupo, String(entry.total), `${Number(entry.tempoTotal || 0).toFixed(1)}s`].forEach(text => {
+                const cell = document.createElement('span');
+                cell.textContent = text;
+                row.appendChild(cell);
+            });
+            list.appendChild(row);
+        });
+    }
+
+    exportRankingFile() {
+        if (!window.ranking || typeof window.ranking.exportCSV !== 'function') return;
+        const text = window.ranking.exportCSV();
+        const blob = new Blob([text], { type: 'text/csv;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'girassois-ranking.csv';
+        link.click();
+        URL.revokeObjectURL(url);
+    }
+
+    getRankingPlace(position) {
+        if (position === 1) return '1º lugar';
+        if (position === 2) return '2º lugar';
+        if (position === 3) return '3º lugar';
+        return `${position}º lugar`;
     }
 
     toggleAudio() {
@@ -382,6 +593,7 @@ class Game {
     }
 
     toggleBunnyCommand() {
+        if (this.currentLevel?.hideBunny) return;
         this.bunny.isWaiting = !this.bunny.isWaiting;
         const btn = document.getElementById('btn-bunny-toggle');
         const textSpan = document.getElementById('bunny-cmd-text');
@@ -407,9 +619,16 @@ class Game {
             return;
         }
 
+        this.isEndingCutscene = false;
+        this.endingCutscenePlayed = false;
         this.currentLevelIndex = index;
         const levelConfig = GAME_LEVELS[index];
         this.currentLevel = levelConfig;
+        if (window.ranking && window.ranking.state.run && typeof window.ranking.startLevel === 'function') {
+            window.ranking.startLevel(levelConfig.id);
+        }
+        audio.setLevelMusic(levelConfig.id);
+        particles.setDarkPalette(levelConfig.id >= 1 && levelConfig.id <= 4);
 
         // Resetar Jogador
         this.player.x = 80;
@@ -417,12 +636,20 @@ class Game {
         this.player.vx = 0;
         this.player.vy = 0;
         this.player.facing = 1;
-        this.player.hearts = 3;
+        this.player.hearts = this.player.maxHearts;
         this.player.isInvulnerable = false;
         this.player.invulnerableTimer = 0;
+        this.shieldTimer = 0;
+        this.shieldCooldown = 0;
+        const shieldCooldownOverlay = document.getElementById('shield-cooldown-overlay');
+        if (shieldCooldownOverlay) shieldCooldownOverlay.style.width = '0%';
+        const touchShieldCooldownOverlay = document.getElementById('touch-shield-cooldown-overlay');
+        if (touchShieldCooldownOverlay) touchShieldCooldownOverlay.style.width = '0%';
         this.player.isAttacking = false;
         this.player.attackTimer = 0;
         this.player.isGrounded = false;
+        this.player.jumpCount = 0;
+        this.player.maxJumps = levelConfig.maxJumps ?? 2;
         this.player.landingTimer = 0;
         this.player.isCrouching = false;
 
@@ -432,6 +659,8 @@ class Game {
         this.bunny.vx = 0;
         this.bunny.vy = 0;
         this.bunny.facing = 1;
+        this.bunny.jumpCooldown = 0;
+        this.bunny.reachAttempted = false;
         this.bunny.eatTimer = 0;
         this.bunny.isWaiting = false;
 
@@ -448,17 +677,22 @@ class Game {
 
         this.isRunner = !!levelConfig.isRunnerLevel;
         this.isSurf = !!levelConfig.isSurfLevel;
+        this.setControlMode(this.controlMode, false);
         document.getElementById('game-container').classList.toggle('surf-active', this.isSurf);
         const isAutoRunner = this.isRunner || this.isSurf;
         const waveButton = document.getElementById('btn-wave-ability');
         const touchWaveButton = document.getElementById('touch-btn-wave');
+        const shieldButton = document.getElementById('btn-shield-ability');
+        const touchShieldButton = document.getElementById('touch-btn-shield');
         const bunnyButton = document.getElementById('btn-bunny-toggle');
         const touchBunnyButton = document.getElementById('touch-btn-bunny');
         const touchJumpButton = document.getElementById('touch-btn-jump');
         if (waveButton) waveButton.classList.toggle('hidden', isAutoRunner);
         if (touchWaveButton) touchWaveButton.classList.toggle('hidden', isAutoRunner);
-        if (bunnyButton) bunnyButton.classList.toggle('hidden', isAutoRunner);
-        if (touchBunnyButton) touchBunnyButton.classList.toggle('hidden', isAutoRunner);
+        if (shieldButton) shieldButton.classList.toggle('hidden', levelConfig.id !== 9);
+        if (touchShieldButton) touchShieldButton.classList.toggle('hidden', levelConfig.id !== 9);
+        if (bunnyButton) bunnyButton.classList.toggle('hidden', isAutoRunner || !!levelConfig.hideBunny);
+        if (touchBunnyButton) touchBunnyButton.classList.toggle('hidden', isAutoRunner || !!levelConfig.hideBunny);
         if (touchJumpButton) touchJumpButton.classList.toggle('hidden', this.isSurf);
         if (this.isRunner) {
             this.runnerScore = 0;
@@ -504,7 +738,10 @@ class Game {
             this.surfSpawnTimer = Math.max(2, levelConfig.surfSpawnMin || 1.05);
             this.surfPlayerX = this.canvas.width / 2;
             this.surfPlayerVelocity = 0;
+            this.surfRowFrame = 1;
+            this.surfRowFrameTimer = 0;
             this.surfWaveOffset = 0;
+            this.surfBoardTilt = 0;
             this.keys.left = false;
             this.keys.right = false;
             this.keys.down = false;
@@ -514,12 +751,18 @@ class Game {
 
         // Clonar plataformas, obstáculos, itens e puzzles
         this.platforms = JSON.parse(JSON.stringify(levelConfig.platforms));
+        this.dynamicPlatforms = JSON.parse(JSON.stringify(levelConfig.dynamicPlatforms || [])).map(plat => ({
+            ...plat,
+            isVisible: true,
+            visibilityAlpha: 1,
+            visibilityTimer: plat.visibleFor || 4,
+            moveDirection: 1
+        }));
         this.obstacles = JSON.parse(JSON.stringify(levelConfig.obstacles));
         this.items = JSON.parse(JSON.stringify(levelConfig.items));
         this.pressurePlates = levelConfig.pressurePlates ? JSON.parse(JSON.stringify(levelConfig.pressurePlates)) : [];
         this.barriers = levelConfig.barriers ? JSON.parse(JSON.stringify(levelConfig.barriers)) : [];
         this.shrines = levelConfig.shrines ? JSON.parse(JSON.stringify(levelConfig.shrines)) : [];
-        this.npcs = [];
 
         particles.clear();
 
@@ -532,8 +775,9 @@ class Game {
             this.boss = {
                 name: levelConfig.boss.name,
                 title: levelConfig.boss.title,
-                spriteKey: levelConfig.boss.spriteKey,
+                spritePrefix: levelConfig.boss.spritePrefix || 'boss',
                 studentSpriteKey: levelConfig.boss.studentSpriteKey,
+                particleColor: levelConfig.boss.particleColor,
                 x: levelConfig.boss.x,
                 y: levelConfig.boss.y,
                 baseX: levelConfig.boss.x,
@@ -549,7 +793,17 @@ class Game {
                 shakeY: 0,
                 movePhase: Math.random() * Math.PI * 2,
                 moveAmplitude: 120,
-                lastHitProfile: 1
+                lastHitProfile: 1,
+                phase: levelConfig.boss.spritePrefix === 'boss' ? 'RIGHT_CAST' : null,
+                phaseTimer: levelConfig.boss.spritePrefix === 'boss' ? 4 : 0,
+                phaseElapsed: 0,
+                castTimer: 0.35,
+                minionTimer: 0.8,
+                phaseStartX: levelConfig.boss.x,
+                phaseStartY: levelConfig.boss.y,
+                phaseTargetX: levelConfig.boss.x,
+                phaseTargetY: levelConfig.boss.y,
+                burstTriggered: false
             };
         }
 
@@ -562,8 +816,98 @@ class Game {
         } else {
             this.showPhraseBanner(`Bem-vindo à ${levelConfig.name}!`);
         }
-        this.state = 'PLAYING';
+        this.cutsceneSlides = Array.isArray(levelConfig.cutscene) ? levelConfig.cutscene : [];
+        this.cutsceneIndex = 0;
+        if (this.cutsceneSlides.length > 0) {
+            this.keys.left = false;
+            this.keys.right = false;
+            this.keys.up = false;
+            this.keys.down = false;
+            this.keys.jump = false;
+            this.keys.jumpPressed = false;
+            this.state = 'CUTSCENE';
+            audio.playCutsceneMusic(levelConfig.id === 1 ? 'intro' : 'mid');
+        } else {
+            this.state = 'PLAYING';
+        }
 
+    }
+
+    advanceCutscene() {
+        if (this.state !== 'CUTSCENE') return;
+        this.cutsceneIndex++;
+        if (this.cutsceneIndex >= this.cutsceneSlides.length) {
+            this.exitCutscene();
+        }
+    }
+
+    skipCutscene() {
+        if (this.state !== 'CUTSCENE') return;
+        this.exitCutscene();
+    }
+
+    exitCutscene() {
+        if (this.isEndingCutscene) {
+            this.isEndingCutscene = false;
+            this.endingCutscenePlayed = true;
+            audio.stopCutsceneMusic();
+            this.showCreditsScreen();
+            return;
+        }
+
+        this.state = 'PLAYING';
+        audio.stopCutsceneMusic();
+        audio.setLevelMusic(this.currentLevel.id);
+    }
+
+    showCreditsScreen() {
+        this.state = 'CREDITS';
+        this.hideAllModals();
+        const creditsRoll = document.getElementById('credits-roll');
+        if (creditsRoll) {
+            creditsRoll.style.animation = 'none';
+            void creditsRoll.offsetHeight;
+            creditsRoll.style.animation = '';
+        }
+        document.getElementById('game-container').classList.add('credits-active');
+        document.getElementById('credits-screen').classList.remove('hidden');
+    }
+
+    finishCredits() {
+        if (this.state !== 'CREDITS') return;
+
+        document.getElementById('credits-screen').classList.add('hidden');
+        document.getElementById('game-container').classList.remove('credits-active');
+        if (this.creditsReturnToLevelSelect) {
+            this.creditsReturnToLevelSelect = false;
+            this.state = 'START';
+            this.showLevelSelect();
+            return;
+        }
+        this.showVictoryScreen();
+    }
+
+    activateShield() {
+        if (this.state !== 'PLAYING' || this.currentLevel?.id !== 9 || this.shieldCooldown > 0) return;
+
+        this.shieldTimer = this.maxShieldDuration;
+        this.shieldCooldown = this.maxShieldCooldown;
+        audio.playWave();
+        particles.emitSparks(this.player.x + this.player.w / 2, this.player.y + this.player.h / 2, 18, '#80d8ff');
+    }
+
+    updateShieldTimers() {
+        const deltaTime = 0.016;
+        this.shieldTimer = Math.max(0, this.shieldTimer - deltaTime);
+        this.shieldCooldown = Math.max(0, this.shieldCooldown - deltaTime);
+
+        const cooldownOverlay = document.getElementById('shield-cooldown-overlay');
+        const touchCooldownOverlay = document.getElementById('touch-shield-cooldown-overlay');
+        const cooldownPct = `${(this.shieldCooldown / this.maxShieldCooldown) * 100}%`;
+        if (cooldownOverlay) {
+            cooldownOverlay.style.width = cooldownPct;
+        }
+        if (touchCooldownOverlay) touchCooldownOverlay.style.width = cooldownPct;
     }
 
     triggerLightWave() {
@@ -623,6 +967,9 @@ class Game {
                 particles.emitText(obsCenterX, obs.y, `${obs.name} Superado! 🌻`, '#ffd54f');
 
                 this.score += 80;
+                if (window.ranking && typeof window.ranking.addEnemy === 'function') {
+                    window.ranking.addEnemy();
+                }
                 this.addHope(15);
                 this.obstacles.splice(i, 1);
                 curedCount++;
@@ -709,10 +1056,10 @@ updateHud() {
 
     const puzzleBadge = document.getElementById('puzzle-badge');
     const puzzleText = document.getElementById('puzzle-status-text');
-    if (this.currentLevel && this.currentLevel.id === 5) {
+    if (this.currentLevel && this.currentLevel.requiredKeys !== undefined) {
         puzzleBadge.classList.remove('hidden');
         puzzleText.textContent = `🔑 Chaves da Mente: ${this.keysCollected}/3`;
-    } else if (this.currentLevel && this.currentLevel.id === 6) {
+    } else if (this.currentLevel && this.currentLevel.requiredShrines !== undefined) {
         puzzleBadge.classList.remove('hidden');
         puzzleText.textContent = `🔥 Chamas da Vida: ${this.shrinesLit}/3`;
     } else {
@@ -732,9 +1079,55 @@ hideAllModals() {
     document.querySelectorAll('.modal-screen').forEach(el => el.classList.add('hidden'));
 }
 
+    showLevelSelect() {
+        const grid = document.getElementById('level-select-grid');
+        const modal = document.getElementById('modal-level-select');
+        if (!grid || !modal) return;
+
+        grid.innerHTML = '';
+        GAME_LEVELS.forEach((level, index) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'btn-mode-choice level-select-button';
+            button.textContent = level.name;
+            button.addEventListener('click', () => {
+                try { audio.init(); } catch (e) { console.warn(e); }
+                this.startLevel(index);
+            });
+            grid.appendChild(button);
+        });
+
+        this.hideAllModals();
+        modal.classList.remove('hidden');
+    }
+
 showLevelCompleteModal() {
     this.state = 'LEVEL_COMPLETE';
     audio.playLevelComplete();
+
+    if (window.ranking && this.currentLevel && typeof window.ranking.endLevel === 'function') {
+        const result = window.ranking.endLevel(this.currentLevel.id, {
+            livesLeft: this.player.hearts,
+            bossDefeated: !!(this.boss && this.boss.state === 'DEFEATED'),
+            damage: this.player.hearts < this.player.maxHearts
+        });
+        const bonusList = document.getElementById('ranking-bonus-list');
+        if (bonusList && result) {
+            bonusList.replaceChildren();
+            [
+                `Tempo: ${result.tempoTotal.toFixed(1)}s`,
+                `Itens: ${result.itens}`,
+                `Acolhidos: ${result.inimigos}`,
+                `Vidas: ${result.livesLeft}`,
+                `Total bônus: ${result.total}`
+            ].forEach(text => {
+                const line = document.createElement('div');
+                line.textContent = text;
+                bonusList.appendChild(line);
+            });
+        }
+    }
+
     this.hideAllModals();
     if (this.currentLevel && this.currentLevel.id === 1 && typeof achievements !== 'undefined') {
         achievements.unlock('phase1_clear');
@@ -772,8 +1165,26 @@ showGameOverModal() {
 }
 
     showVictoryScreen() {
+        if (!this.endingCutscenePlayed && Array.isArray(window.ENDING_CUTSCENE) && window.ENDING_CUTSCENE.length > 0) {
+            this.state = 'CUTSCENE';
+            this.cutsceneSlides = window.ENDING_CUTSCENE;
+            this.cutsceneIndex = 0;
+            this.isEndingCutscene = true;
+            this.hideAllModals();
+            audio.playCutsceneMusic('end');
+            return;
+        }
+
         this.state = 'VICTORY';
         audio.playLevelComplete();
+
+        const runSummary = window.ranking && typeof window.ranking.finishRun === 'function'
+            ? window.ranking.finishRun()
+            : null;
+        const submitted = window.ranking && typeof window.ranking.submit === 'function'
+            ? window.ranking.submit()
+            : null;
+
         this.hideAllModals();
 
         if (typeof achievements !== 'undefined') {
@@ -784,13 +1195,29 @@ showGameOverModal() {
             }
         }
 
-        document.getElementById('victory-score').textContent = this.score;
+        const group = submitted || (window.ranking && window.ranking.getGroup ? window.ranking.getGroup() : null);
+        document.getElementById('victory-group').textContent = group
+            ? `${group.grupo} — ${group.turma}`
+            : 'Sem grupo registrado';
+        document.getElementById('victory-score').textContent = String(runSummary ? runSummary.total : this.score);
+        document.getElementById('victory-time').textContent = `${Number(runSummary?.tempoTotal || 0).toFixed(1)}s`;
+        document.getElementById('victory-items').textContent = String(runSummary?.itens || 0);
+        document.getElementById('victory-rescued').textContent = String(runSummary?.inimigos || 0);
+        document.getElementById('victory-position').textContent = submitted?.position
+            ? this.getRankingPlace(submitted.position)
+            : '—';
         const modal = document.getElementById('modal-victory');
         modal.classList.remove('hidden');
     }
 
     update() {
+        if (this.state === 'PLAYING' && window.ranking && typeof window.ranking.addFrameTime === 'function') {
+            window.ranking.addFrameTime(this.frameDeltaMs || 16.666);
+        }
+
         if (this.state !== 'PLAYING') return;
+
+        this.updateShieldTimers();
 
         if (this.isSurf) {
             this.updateSurf();
@@ -838,10 +1265,11 @@ showGameOverModal() {
 
         this.updatePuzzles();
         if (this.boss) this.updateBoss();
+        this.updateDynamicPlatforms();
         this.updatePlayer();
         this.updatePlayerProjectiles();
         this.updateBossAttacks();
-        this.updateBunny();
+        if (!this.currentLevel.hideBunny) this.updateBunny();
         this.updateObstacles();
         this.checkItemCollisions();
         this.checkObstacleCollisions();
@@ -853,16 +1281,51 @@ showGameOverModal() {
         particles.update();
     }
 
+    updateDynamicPlatforms() {
+        if (this.dynamicPlatforms.length === 0) return;
+        if (this.currentLevel?.boss?.spritePrefix === 'narciso' && (!this.boss || this.boss.state === 'DEFEATED')) return;
+
+        const deltaTime = 1 / 60;
+        for (const plat of this.dynamicPlatforms) {
+            if (plat.moveAxis && plat.moveRange && plat.moveSpeed) {
+                plat[plat.moveAxis] += plat.moveDirection * plat.moveSpeed * deltaTime;
+                const [min, max] = plat.moveRange;
+                if (plat[plat.moveAxis] >= max) {
+                    plat[plat.moveAxis] = max;
+                    plat.moveDirection = -1;
+                } else if (plat[plat.moveAxis] <= min) {
+                    plat[plat.moveAxis] = min;
+                    plat.moveDirection = 1;
+                }
+            }
+
+            if (plat.visibleFor > 0 && plat.hiddenFor > 0) {
+                plat.visibilityTimer -= deltaTime;
+                if (plat.visibilityTimer <= 0) {
+                    plat.isVisible = !plat.isVisible;
+                    plat.visibilityTimer = plat.isVisible ? plat.visibleFor : plat.hiddenFor;
+                }
+            }
+
+            const fadeStep = deltaTime / 0.25;
+            plat.visibilityAlpha = Math.max(0, Math.min(1, plat.visibilityAlpha + (plat.isVisible ? fadeStep : -fadeStep)));
+        }
+    }
+
+    getActivePlatforms() {
+        return this.platforms.concat(this.dynamicPlatforms.filter(plat => plat.isVisible));
+    }
+
     updatePuzzles() {
-        // FASE 5: Atualizar Placas de Pressão e Barreiras
-        if (this.currentLevel && this.currentLevel.id === 5) {
+        // Atualizar placas de pressão e barreiras quando configuradas na fase
+        if (this.currentLevel && this.pressurePlates.length > 0) {
             const p = this.player;
             const b = this.bunny;
 
             for (let plate of this.pressurePlates) {
                 const plateBox = { x: plate.x, y: plate.y - 8, w: plate.w, h: plate.h + 12 };
                 const playerOn = this.checkAABB(p, plateBox);
-                const bunnyOn = this.checkAABB(b, plateBox);
+                const bunnyOn = !this.currentLevel.hideBunny && this.checkAABB(b, plateBox);
 
                 const wasPressed = plate.isPressed;
                 plate.isPressed = playerOn || bunnyOn;
@@ -995,7 +1458,7 @@ showGameOverModal() {
         const wasAirborne = !p.isGrounded;
         p.isGrounded = false;
 
-        for (let plat of this.platforms) {
+        for (let plat of this.getActivePlatforms()) {
             // Se for plataforma invisível e NÃO estiver iluminada, ignora colisão
             if (plat.invisible && (!plat.lightTimer || plat.lightTimer <= 0)) {
                 continue;
@@ -1039,6 +1502,7 @@ showGameOverModal() {
         const b = this.bunny;
         const p = this.player;
         const prevBottom = b.y + b.h;
+        b.jumpCooldown = Math.max(0, b.jumpCooldown - 1 / 60);
 
         // Se o coelho recebeu o comando de esperar/sentar no local (Tecla F)
         if (b.isWaiting) {
@@ -1048,20 +1512,33 @@ showGameOverModal() {
             // Segue o jogador
             const targetX = p.facing === 1 ? p.x - 42 : p.x + p.w + 12;
             const dist = targetX - b.x;
+            const horizontalDistance = Math.abs(dist);
+
+            if (horizontalDistance > 150 || (b.isGrounded && p.y >= b.y - 20)) {
+                b.reachAttempted = false;
+            }
 
             if (Math.abs(dist) > 16) {
                 b.facing = dist > 0 ? 1 : -1;
-                b.vx = Math.sign(dist) * 2.5;
+                b.vx = Math.max(-2.5, Math.min(2.5, dist * 0.08));
                 b.eatTimer = 0;
-
-                if (b.isGrounded && (Math.abs(dist) > 80 || p.y < b.y - 20)) {
-                    b.vy = -8.5;
-                    b.isGrounded = false;
-                }
             } else {
                 b.vx *= 0.6;
                 if (Math.abs(b.vx) < 0.05) b.vx = 0;
                 b.eatTimer += 0.016;
+            }
+
+            if (b.isGrounded && b.jumpCooldown <= 0) {
+                if (horizontalDistance > 80) {
+                    b.vy = -8.5;
+                    b.isGrounded = false;
+                    b.jumpCooldown = 0.6;
+                } else if (!b.reachAttempted && p.y < b.y - 20 && horizontalDistance < 120) {
+                    b.vy = -8.5;
+                    b.isGrounded = false;
+                    b.jumpCooldown = 0.6;
+                    b.reachAttempted = true;
+                }
             }
         }
 
@@ -1073,7 +1550,7 @@ showGameOverModal() {
         const currBottom = b.y + b.h;
         b.isGrounded = false;
 
-        for (let plat of this.platforms) {
+        for (let plat of this.getActivePlatforms()) {
             if (plat.invisible && (!plat.lightTimer || plat.lightTimer <= 0)) {
                 continue;
             }
@@ -1123,6 +1600,9 @@ showGameOverModal() {
 
             if (this.checkAABB(p, itemBox)) {
                 this.score += it.points;
+                if (window.ranking && typeof window.ranking.addItem === 'function') {
+                    window.ranking.addItem(it.points);
+                }
                 particles.emitSparks(it.x + 16, it.y + 16, 18, '#ffd700');
                 particles.emitText(it.x + 16, it.y, `+${it.points} Empatia!`);
                 this.addHope(10);
@@ -1155,7 +1635,7 @@ showGameOverModal() {
 
     checkObstacleCollisions() {
         const p = this.player;
-        if (p.isInvulnerable) return;
+        if (p.isInvulnerable || this.shieldTimer > 0) return;
 
         const playerBox = {
             x: p.x + 6,
@@ -1180,7 +1660,7 @@ showGameOverModal() {
     }
 
     playerTakeDamage(obs) {
-        if (this.player.isInvulnerable) return;
+        if (this.player.isInvulnerable || this.shieldTimer > 0) return;
 
         this.player.hearts = Math.max(0, this.player.hearts - 1);
         this.player.isInvulnerable = true;
@@ -1198,8 +1678,14 @@ showGameOverModal() {
         particles.emitSparks(this.player.x + this.player.w / 2, this.player.y + this.player.h / 2, 14, '#9c88ff');
         particles.emitText(this.player.x + this.player.w / 2, this.player.y, '-1 Coração! Use [E] para iluminar a dor.', '#ffb8b8');
 
-        particles.emitHearts(this.bunny.x + this.bunny.w / 2, this.bunny.y, 4);
+        if (!this.currentLevel?.hideBunny) {
+            particles.emitHearts(this.bunny.x + this.bunny.w / 2, this.bunny.y, 4);
+        }
         this.updateHud();
+
+        if (window.ranking && typeof window.ranking.addDamage === 'function') {
+            window.ranking.addDamage();
+        }
 
         if (this.player.hearts <= 0) {
             this.showGameOverModal();
@@ -1212,7 +1698,7 @@ showGameOverModal() {
         const portalX = this.currentLevel.portalX;
 
         // Na Fase 5: exige as 3 chaves
-        if (this.currentLevel.id === 5 && this.keysCollected < this.currentLevel.requiredKeys) {
+        if (this.currentLevel.requiredKeys !== undefined && this.keysCollected < this.currentLevel.requiredKeys) {
             if (p.x + p.w >= portalX - 20 && p.x <= portalX + 80) {
                 this.showPhraseBanner(`O Portão do Santuário está trancado! Encontre as 3 Chaves com seu coelho (${this.keysCollected}/3).`);
             }
@@ -1220,18 +1706,19 @@ showGameOverModal() {
         }
 
         // Na Fase 6: exige as 3 chamas acesas
-        if (this.currentLevel.id === 6 && this.shrinesLit < this.currentLevel.requiredShrines) {
+        if (this.currentLevel.requiredShrines !== undefined && this.shrinesLit < this.currentLevel.requiredShrines) {
             if (p.x + p.w >= portalX - 20 && p.x <= portalX + 80) {
                 this.showPhraseBanner(`O Portal Supremo aguarda que você acenda as 3 Chamas da Vida com [E] (${this.shrinesLit}/3)!`);
             }
             return;
         }
 
-        // Na Fase 7: exige derrotar o Boss Final
-        if (this.currentLevel.id === 7) {
-            if (this.boss && this.boss.state !== 'DEFEATED') {
-                return; // Portal só abre após transformar a Grande Sombra!
-            }
+        if (this.currentLevel.isBossLevel && this.boss && this.boss.state !== 'DEFEATED') {
+            return;
+        }
+
+        // Boss final: vitória após derrotá-lo e alcançar o portal
+        if (this.currentLevel.boss?.spritePrefix === 'boss') {
             if (p.x + p.w >= portalX - 40 && p.x <= portalX + 80) {
                 particles.emitSparks(portalX + 40, 380, 40, '#ffd700');
                 this.showVictoryScreen();
@@ -1245,7 +1732,7 @@ showGameOverModal() {
             this.addHope(30);
 
             // Se completou a Fase 7 ou superior, vitória definitiva!
-            if (this.currentLevel.id >= 7) {
+            if (this.currentLevelIndex === GAME_LEVELS.length - 1) {
                 this.showVictoryScreen();
             } else {
                 this.showLevelCompleteModal();
@@ -1272,6 +1759,17 @@ showGameOverModal() {
         );
     }
 
+    getBossAttackPlayerBox() {
+        const p = this.player;
+        const top = p.isCrouching ? p.y + p.h * 0.45 : p.y;
+        return {
+            x: p.x,
+            y: top,
+            w: p.w,
+            h: p.y + p.h - top
+        };
+    }
+
     // =========================================================================
     // MECÂNICAS DO MODO ENDLESS RUNNER (FASE 3 - ESTILO GOOGLE CHROME DINO)
     // =========================================================================
@@ -1288,6 +1786,11 @@ showGameOverModal() {
 
     updateSurf() {
         const frameTime = 0.016;
+        this.surfRowFrameTimer += frameTime;
+        if (this.surfRowFrameTimer >= 0.1) {
+            this.surfRowFrame = (this.surfRowFrame % 5) + 1;
+            this.surfRowFrameTimer = 0;
+        }
         const progress = Math.min(1, this.surfScore / this.surfTargetScore);
         const direction = Number(this.keys.right) - Number(this.keys.left);
         if (direction !== 0) {
@@ -1308,7 +1811,9 @@ showGameOverModal() {
         }
 
         this.surfSpeed = this.surfBaseSpeed + progress * (this.surfMaxSpeed - this.surfBaseSpeed);
-        this.surfWaveOffset = (this.surfWaveOffset + this.surfSpeed) % 84;
+        this.surfWaveOffset = (this.surfWaveOffset + this.surfBgScrollSpeed) % 1024;
+        const targetTilt = Math.max(-0.25, Math.min(0.25, this.surfPlayerVelocity * 0.018));
+        this.surfBoardTilt += (targetTilt - this.surfBoardTilt) * 0.12;
 
         if (this.surfScore >= this.surfTargetScore) {
             particles.emitSunflowerBloom(480, 400);
@@ -1342,6 +1847,9 @@ showGameOverModal() {
                     particles.emitSparks(object.x, object.y, 18, '#ffe082');
                     particles.emitText(object.x, object.y - 12, `+${object.points} esperança`, '#fff1a8');
                     this.surfObstacles.splice(index, 1);
+                } else if (this.shieldTimer > 0) {
+                    particles.emitSparks(object.x, object.y, 18, '#80d8ff');
+                    this.surfObstacles.splice(index, 1);
                 } else {
                     audio.playHurt();
                     particles.emitSparks(this.surfPlayerX, 425, 24, '#ff8a65');
@@ -1363,6 +1871,14 @@ showGameOverModal() {
             : type === 'hope'
                 ? { w: 38, h: 38 }
                 : { w: 62, h: 66 };
+        const ghostSprites = [
+            'obs_fantasma_tristeza_1',
+            'obs_fantasma_tristeza_2',
+            'obs_fantasma_tristeza_3'
+        ];
+        const spriteKey = type === 'rock' && this.currentLevel.waterTextureKey
+            ? ghostSprites[Math.floor(Math.random() * ghostSprites.length)]
+            : null;
 
         this.surfObstacles.push({
             type,
@@ -1371,7 +1887,8 @@ showGameOverModal() {
             w: dimensions.w,
             h: dimensions.h,
             points: 50,
-            empathy: 8
+            empathy: 8,
+            ...(spriteKey ? { spriteKey } : {})
         });
     }
 
@@ -1433,7 +1950,7 @@ showGameOverModal() {
 
         // 3. Efeito de esteira de chão e fundo noturno em rolagem contínua
         this.runnerGroundOffset = (this.runnerGroundOffset + this.runnerSpeed) % 48;
-        this.runnerBgOffset = (this.runnerBgOffset + this.runnerSpeed * 0.35) % this.canvas.width;
+        this.runnerBgOffset = (this.runnerBgOffset + this.runnerSpeed * 0.35) % (this.canvas.width * 2);
 
         // 4. Meta de pontuação atingida -> Vitória da Fase e Avanço para Fase 4!
         if (this.runnerScore >= this.runnerTargetScore) {
@@ -1482,7 +1999,13 @@ showGameOverModal() {
         }
 
         const groundY = (this.currentLevel && this.currentLevel.groundY) || 460;
-        const types = (this.currentLevel && this.currentLevel.runnerObstacleTypes) || [
+        const obstacleTypes = this.currentLevel.runnerObstacleTypes || [
+            { type: 'runner_obstacle1', name: 'Obstáculo', w: 52, h: 58 },
+            { type: 'runner_obstacle2', name: 'Obstáculo', w: 50, h: 58 },
+            { type: 'runner_obstacle3', name: 'Obstáculo', w: 58, h: 58 },
+            { type: 'runner_obstacle4', name: 'Obstáculo', w: 58, h: 60 }
+        ];
+        const collectibleTypes = [
             { type: 'item_chave', name: 'Chave', w: 34, h: 34 },
             { type: 'item_disco_180', name: 'Disco 180', w: 36, h: 36 },
             { type: 'item_disco_190', name: 'Disco 190', w: 36, h: 36 },
@@ -1493,6 +2016,36 @@ showGameOverModal() {
             { type: 'item_dialogo', name: 'Diálogo', w: 36, h: 36 },
             { type: 'item_rede_apoio', name: 'Rede de Apoio', w: 38, h: 38 }
         ];
+
+        const riskChance = this.currentLevel.runnerRiskChance ?? 0.18;
+        if (Math.random() < riskChance) {
+            const obstacle = obstacleTypes[Math.floor(Math.random() * obstacleTypes.length)];
+            const collectible = collectibleTypes[Math.floor(Math.random() * collectibleTypes.length)];
+            const obstacleX = this.canvas.width + 40;
+
+            this.runnerObstacles.push({
+                type: obstacle.type,
+                name: obstacle.name,
+                x: obstacleX,
+                y: groundY - obstacle.h,
+                w: obstacle.w,
+                h: obstacle.h,
+                isCollectible: false,
+                isHole: false
+            });
+            this.runnerObstacles.push({
+                type: collectible.type,
+                name: collectible.name,
+                x: obstacleX + obstacle.w - collectible.w * 0.35,
+                y: groundY - obstacle.h - collectible.h + 6,
+                w: collectible.w,
+                h: collectible.h,
+                isCollectible: true,
+                points: 60 + Math.floor(Math.random() * 31),
+                color: '#ffd700'
+            });
+            return;
+        }
 
         const holeChance = this.currentLevel.runnerHoleChance ?? 0.28;
         if (Math.random() < holeChance) {
@@ -1525,14 +2078,14 @@ showGameOverModal() {
             return;
         }
 
-        const chosen = types[Math.floor(Math.random() * types.length)];
         const itemChance = this.currentLevel.runnerCollectibleChance ?? 0.72;
         if (Math.random() < itemChance) {
+            const chosen = collectibleTypes[Math.floor(Math.random() * collectibleTypes.length)];
             const pickup = {
                 type: chosen.type,
                 name: chosen.name,
                 x: this.canvas.width + 40,
-                y: groundY - chosen.h - 18,
+                y: groundY - 190,
                 w: chosen.w,
                 h: chosen.h,
                 isCollectible: true,
@@ -1541,6 +2094,7 @@ showGameOverModal() {
             };
             this.runnerObstacles.push(pickup);
         } else {
+            const chosen = obstacleTypes[Math.floor(Math.random() * obstacleTypes.length)];
             this.runnerObstacles.push({
                 type: chosen.type,
                 name: chosen.name,
@@ -1551,36 +2105,35 @@ showGameOverModal() {
                 isCollectible: false,
                 isHole: false
             });
-        }
 
-        if (this.runnerScore >= 300) {
-            let doubleChance = 0;
-            if (this.runnerScore <= 500) {
-                doubleChance = 0.03 + ((this.runnerScore - 300) / 200) * 0.05;
-            } else {
-                doubleChance = Math.min(0.15, 0.08 + ((this.runnerScore - 500) / 500) * 0.07);
-            }
+            if (this.runnerScore >= 300) {
+                let doubleChance = 0;
+                if (this.runnerScore <= 500) {
+                    doubleChance = 0.03 + ((this.runnerScore - 300) / 200) * 0.05;
+                } else {
+                    doubleChance = Math.min(0.15, 0.08 + ((this.runnerScore - 500) / 500) * 0.07);
+                }
 
-            if (Math.random() < doubleChance) {
-                const second = types[Math.floor(Math.random() * types.length)];
-                const secondItem = {
-                    type: second.type,
-                    name: second.name,
-                    x: this.canvas.width + 40 + chosen.w + 20,
-                    y: groundY - second.h - 18,
-                    w: second.w,
-                    h: second.h,
-                    isCollectible: false,
-                    isHole: false
-                };
-                this.runnerObstacles.push(secondItem);
+                if (Math.random() < doubleChance) {
+                    const second = obstacleTypes[Math.floor(Math.random() * obstacleTypes.length)];
+                    this.runnerObstacles.push({
+                        type: second.type,
+                        name: second.name,
+                        x: this.canvas.width + 40 + chosen.w + 20,
+                        y: groundY - second.h,
+                        w: second.w,
+                        h: second.h,
+                        isCollectible: false,
+                        isHole: false
+                    });
+                }
             }
         }
     }
 
     checkRunnerCollisions() {
         const p = this.player;
-        if (p.isInvulnerable) return;
+        if (p.isInvulnerable || this.shieldTimer > 0) return;
 
         const playerBox = {
             x: p.x + 10,
@@ -1600,6 +2153,19 @@ showGameOverModal() {
 
             if (this.checkAABB(playerBox, obsBox)) {
                 this.runnerObstacles.splice(i, 1);
+                if (obs.isCollectible) {
+                    this.runnerScore += obs.points;
+                    this.score = this.runnerScore;
+                    this.addHope(1);
+                    if (window.ranking && typeof window.ranking.addItem === 'function') {
+                        window.ranking.addItem(obs.points);
+                    }
+                    audio.playCollect();
+                    particles.emitSparks(obs.x + obs.w / 2, obs.y + obs.h / 2, 14, '#ffd700');
+                    particles.emitText(obs.x + obs.w / 2, obs.y - 8, `+${obs.points}`, '#ffd700');
+                    this.updateHud();
+                    continue;
+                }
                 p.hearts = Math.max(0, p.hearts - 1);
                 p.isInvulnerable = true;
                 p.invulnerableTimer = 0.9;
@@ -1619,6 +2185,8 @@ showGameOverModal() {
     renderSurf(ctx) {
         const width = this.canvas.width;
         const height = this.canvas.height;
+        const horizonY = 132;
+        const hasConfiguredSky = !!this.currentLevel.skyBackgroundKey;
         const ocean = ctx.createLinearGradient(0, 0, 0, height);
         ocean.addColorStop(0, '#79d8cf');
         ocean.addColorStop(0.48, '#168c9a');
@@ -1626,33 +2194,75 @@ showGameOverModal() {
         ctx.fillStyle = ocean;
         ctx.fillRect(0, 0, width, height);
 
-        ctx.fillStyle = 'rgba(255, 231, 164, 0.75)';
-        ctx.beginPath();
-        ctx.arc(width - 92, 92, 25, 0, Math.PI * 2);
-        ctx.fill();
+        const configuredWaterTexture = this.currentLevel.waterTextureKey
+            ? sprites.get(this.currentLevel.waterTextureKey)
+            : null;
+        const waterTexture = configuredWaterTexture && configuredWaterTexture.complete && configuredWaterTexture.naturalWidth > 0
+            ? configuredWaterTexture
+            : sprites.get('surf_water');
+        if (waterTexture && waterTexture.complete && waterTexture.naturalWidth > 0) {
+            const tileWidth = waterTexture.naturalWidth;
+            const tileHeight = waterTexture.naturalHeight;
+            const scrollY = this.surfWaveOffset % tileHeight;
+            const scrollX = (this.surfWaveOffset * 0.18) % tileWidth;
+            const waterStartY = hasConfiguredSky ? 0 : horizonY;
 
-        for (let band = 0; band < 12; band++) {
-            const y = ((band * 62 + this.surfWaveOffset * 2.1) % (height + 62)) - 31;
-            for (let trace = 0; trace < 6; trace++) {
-                const x = trace * 176 + ((band % 2) * 70) + Math.sin(band + trace) * 18;
-                const length = 42 + ((band * 19 + trace * 23) % 58);
-                ctx.strokeStyle = `rgba(215, 255, 248, ${0.2 + ((band + trace) % 4) * 0.045})`;
-                ctx.lineWidth = 1 + ((band + trace) % 3) * 0.45;
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(0, waterStartY, width, height - waterStartY);
+            ctx.clip();
+            for (let y = waterStartY - tileHeight - scrollY; y < height; y += tileHeight) {
+                for (let x = -tileWidth - scrollX; x < width; x += tileWidth) {
+                    ctx.drawImage(waterTexture, x, y);
+                }
+            }
+            ctx.restore();
+        }
+
+        const hasCustomBackground = configuredWaterTexture && configuredWaterTexture.complete && configuredWaterTexture.naturalWidth > 0;
+        if (hasCustomBackground && !hasConfiguredSky) {
+            const blendTop = horizonY - (hasConfiguredSky ? 20 : 14);
+            const blendBottom = horizonY + (hasConfiguredSky ? 24 : 18);
+            const blendColor = hasConfiguredSky ? 'rgba(200, 205, 230' : 'rgba(205, 224, 211';
+            const horizonBlend = ctx.createLinearGradient(0, blendTop, 0, blendBottom);
+            horizonBlend.addColorStop(0, `${blendColor}, 0)`);
+            horizonBlend.addColorStop(0.45, `${blendColor}, ${hasConfiguredSky ? 0.12 : 0.18})`);
+            horizonBlend.addColorStop(1, `${blendColor}, 0)`);
+            ctx.fillStyle = horizonBlend;
+            ctx.fillRect(0, blendTop, width, blendBottom - blendTop);
+        }
+
+        if (!hasConfiguredSky) {
+            ctx.fillStyle = 'rgba(255, 231, 164, 0.75)';
+            ctx.beginPath();
+            ctx.arc(width - 92, 92, 25, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        if (!hasConfiguredSky) {
+            ctx.strokeStyle = 'rgba(231, 255, 245, 0.6)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, horizonY);
+            ctx.lineTo(width, horizonY);
+            ctx.stroke();
+        }
+
+        if (!hasConfiguredSky) {
+            ctx.fillStyle = 'rgba(239, 255, 248, 0.5)';
+            for (const cloud of [
+                { x: 150, y: 82, w: 76, h: 18 },
+                { x: 680, y: 112, w: 94, h: 20 }
+            ]) {
                 ctx.beginPath();
-                ctx.moveTo(x, y);
-                ctx.quadraticCurveTo(x + length * 0.5, y - 5, x + length, y + 1);
-                ctx.stroke();
+                ctx.ellipse(cloud.x, cloud.y, cloud.w * 0.5, cloud.h * 0.5, 0, 0, Math.PI * 2);
+                ctx.ellipse(cloud.x - cloud.w * 0.22, cloud.y + 2, cloud.w * 0.24, cloud.h * 0.38, 0, 0, Math.PI * 2);
+                ctx.ellipse(cloud.x + cloud.w * 0.2, cloud.y + 1, cloud.w * 0.28, cloud.h * 0.42, 0, 0, Math.PI * 2);
+                ctx.fill();
             }
         }
 
-        ctx.fillStyle = 'rgba(222, 255, 245, 0.28)';
-        for (let sparkle = 0; sparkle < 18; sparkle++) {
-            const x = (sparkle * 137 + (sparkle % 3) * 41) % width;
-            const y = (sparkle * 83 + this.surfWaveOffset * 2.8) % height;
-            ctx.beginPath();
-            ctx.ellipse(x, y, 2 + sparkle % 3, 1.4, 0, 0, Math.PI * 2);
-            ctx.fill();
-        }
+        particles.drawSpecters(ctx);
 
         for (const object of this.surfObstacles) {
             ctx.save();
@@ -1711,99 +2321,52 @@ showGameOverModal() {
                 ctx.arc(0, 0, 5, 0, Math.PI * 2);
                 ctx.fill();
             } else {
-                ctx.fillStyle = 'rgba(3, 49, 62, 0.28)';
-                ctx.beginPath();
-                ctx.ellipse(3, 9, object.w * 0.55, object.h * 0.42, 0, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = '#607d78';
-                ctx.beginPath();
-                ctx.moveTo(-object.w * 0.45, object.h * 0.22);
-                ctx.lineTo(-object.w * 0.36, -object.h * 0.23);
-                ctx.lineTo(-object.w * 0.08, -object.h * 0.48);
-                ctx.lineTo(object.w * 0.24, -object.h * 0.34);
-                ctx.lineTo(object.w * 0.45, object.h * 0.12);
-                ctx.lineTo(object.w * 0.3, object.h * 0.43);
-                ctx.lineTo(-object.w * 0.2, object.h * 0.45);
-                ctx.closePath();
-                ctx.fill();
-                ctx.strokeStyle = 'rgba(234, 255, 248, 0.75)';
-                ctx.lineWidth = 2;
-                ctx.stroke();
+                const ghostSprite = this.currentLevel.waterTextureKey && object.spriteKey
+                    ? sprites.get(object.spriteKey)
+                    : null;
+                if (ghostSprite && ghostSprite.complete && ghostSprite.naturalWidth > 0) {
+                    const scale = Math.min(object.w / ghostSprite.naturalWidth, object.h / ghostSprite.naturalHeight);
+                    const drawWidth = ghostSprite.naturalWidth * scale;
+                    const drawHeight = ghostSprite.naturalHeight * scale;
+                    sprites.draw(ctx, object.spriteKey, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+                } else {
+                    ctx.fillStyle = 'rgba(3, 49, 62, 0.28)';
+                    ctx.beginPath();
+                    ctx.ellipse(3, 9, object.w * 0.55, object.h * 0.42, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#607d78';
+                    ctx.beginPath();
+                    ctx.moveTo(-object.w * 0.45, object.h * 0.22);
+                    ctx.lineTo(-object.w * 0.36, -object.h * 0.23);
+                    ctx.lineTo(-object.w * 0.08, -object.h * 0.48);
+                    ctx.lineTo(object.w * 0.24, -object.h * 0.34);
+                    ctx.lineTo(object.w * 0.45, object.h * 0.12);
+                    ctx.lineTo(object.w * 0.3, object.h * 0.43);
+                    ctx.lineTo(-object.w * 0.2, object.h * 0.45);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.strokeStyle = 'rgba(234, 255, 248, 0.75)';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
             }
             ctx.restore();
         }
 
         const surferY = 426 + Math.sin(Date.now() / 130) * 2;
-        ctx.save();
-        ctx.translate(this.surfPlayerX, surferY);
-        ctx.rotate(this.surfPlayerVelocity * 0.018);
-
-        ctx.fillStyle = 'rgba(2, 39, 51, 0.35)';
-        ctx.beginPath();
-        ctx.ellipse(2, 8, 25, 48, 0, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.strokeStyle = 'rgba(235, 255, 248, 0.85)';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(-9, 51);
-        ctx.quadraticCurveTo(-16, 70, -9, 84);
-        ctx.moveTo(9, 51);
-        ctx.quadraticCurveTo(16, 70, 9, 84);
-        ctx.stroke();
-
-        const board = ctx.createLinearGradient(-16, 0, 16, 0);
-        board.addColorStop(0, '#ff8a65');
-        board.addColorStop(0.5, '#fff8df');
-        board.addColorStop(1, '#ffe082');
-        ctx.fillStyle = board;
-        ctx.beginPath();
-        ctx.moveTo(0, -43);
-        ctx.quadraticCurveTo(15, -32, 15, 0);
-        ctx.lineTo(11, 36);
-        ctx.quadraticCurveTo(0, 47, -11, 36);
-        ctx.lineTo(-15, 0);
-        ctx.quadraticCurveTo(-15, -32, 0, -43);
-        ctx.closePath();
-        ctx.fill();
-        ctx.strokeStyle = '#fffef1';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-
-        ctx.strokeStyle = '#174f60';
-        ctx.lineWidth = 6;
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.moveTo(-5, 21);
-        ctx.lineTo(-5, 36);
-        ctx.moveTo(5, 21);
-        ctx.lineTo(5, 36);
-        ctx.stroke();
-
-        ctx.fillStyle = '#f0b28e';
-        ctx.beginPath();
-        ctx.arc(0, -18, 8, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#263c4b';
-        ctx.beginPath();
-        ctx.arc(0, -20, 8, Math.PI, Math.PI * 2);
-        ctx.fill();
-
-        ctx.fillStyle = '#ffd166';
-        ctx.beginPath();
-        ctx.ellipse(0, 1, 9, 15, 0, 0, Math.PI * 2);
-        ctx.closePath();
-        ctx.fill();
-
-        ctx.strokeStyle = '#f0b28e';
-        ctx.lineWidth = 5;
-        ctx.beginPath();
-        ctx.moveTo(-7, -4);
-        ctx.lineTo(-18, 8 + Math.sin(Date.now() / 120) * 3);
-        ctx.moveTo(7, -4);
-        ctx.lineTo(18, 8 - Math.sin(Date.now() / 120) * 3);
-        ctx.stroke();
-        ctx.restore();
+        const rowSpriteKey = 'remo_' + this.surfRowFrame;
+        const rowSprite = sprites.get(rowSpriteKey);
+        const targetW = 90;
+        const targetH = 210;
+        let drawWidth = targetW;
+        let drawHeight = targetH;
+        if (rowSprite && rowSprite.complete && rowSprite.naturalWidth > 0 && rowSprite.naturalHeight > 0) {
+            const scale = Math.min(targetW / rowSprite.naturalWidth, targetH / rowSprite.naturalHeight);
+            drawWidth = rowSprite.naturalWidth * scale;
+            drawHeight = rowSprite.naturalHeight * scale;
+        }
+        sprites.draw(ctx, rowSpriteKey, this.surfPlayerX - drawWidth / 2, surferY - drawHeight / 2, drawWidth, drawHeight);
+        this.renderShieldGlow(ctx, this.surfPlayerX - drawWidth / 2, surferY - drawHeight / 2, drawWidth, drawHeight);
 
         particles.draw(ctx, 0);
     }
@@ -1812,9 +2375,24 @@ showGameOverModal() {
         // 1. Cenário Noturno de Fundo em parallax contínuo
         const bgImg = sprites.get(this.currentLevel.bgKey);
         if (bgImg && bgImg.complete && bgImg.naturalWidth > 0) {
+            const W = this.canvas.width;
+            const H = this.canvas.height;
             const bgX = this.runnerBgOffset;
-            ctx.drawImage(bgImg, -bgX, 0, this.canvas.width, this.canvas.height);
-            ctx.drawImage(bgImg, this.canvas.width - bgX, 0, this.canvas.width, this.canvas.height);
+
+            for (let j = 0; j < 3; j++) {
+                const x = j * W - bgX;
+                const mirrored = (j % 2 === 1);
+
+                ctx.save();
+                if (mirrored) {
+                    ctx.translate(x + W, 0);
+                    ctx.scale(-1, 1);
+                    ctx.drawImage(bgImg, 0, 0, W, H);
+                } else {
+                    ctx.drawImage(bgImg, x, 0, W, H);
+                }
+                ctx.restore();
+            }
         } else {
             const skyGrad = ctx.createLinearGradient(0, 0, 0, this.canvas.height);
             skyGrad.addColorStop(0, '#0f172a');
@@ -1839,6 +2417,9 @@ showGameOverModal() {
             ctx.fillStyle = '#2d3748';
             ctx.fillRect(0, groundY, this.canvas.width, this.canvas.height - groundY);
         }
+
+        particles.drawSpecters(ctx);
+        this.renderRunnerShadow(ctx, groundY);
 
         // Linha superior de solo brilhante
         ctx.strokeStyle = '#cbd5e1';
@@ -1873,10 +2454,6 @@ showGameOverModal() {
 
                 ctx.fillStyle = '#000';
                 ctx.fillRect(obs.x + obs.w * 0.18, groundY + 16, obs.w * 0.64, 8);
-                ctx.font = 'bold 10px "Segoe UI", Arial';
-                ctx.fillStyle = '#dfe6f0';
-                ctx.textAlign = 'center';
-                ctx.fillText('BURACO', obs.x + obs.w / 2, groundY - 6);
                 ctx.restore();
                 continue;
             }
@@ -1923,25 +2500,15 @@ showGameOverModal() {
 
             if (obs.isCollectible) {
                 sprites.draw(ctx, obs.type, obs.x, obs.y, obs.w, obs.h, false);
-                ctx.fillStyle = '#ffd700';
-                ctx.font = 'bold 10px "Segoe UI", Arial';
-                ctx.textAlign = 'center';
-                ctx.fillText(`+${obs.points}`, obs.x + obs.w / 2, obs.y - 8);
             } else {
                 sprites.draw(ctx, obs.type, obs.x, obs.y, obs.w, obs.h, false);
-                ctx.font = 'bold 11px "Segoe UI", Arial';
-                ctx.fillStyle = '#fffae6';
-                ctx.textAlign = 'center';
-                ctx.shadowColor = '#000';
-                ctx.shadowBlur = 4;
-                ctx.fillText(obs.name, obs.x + obs.w / 2, obs.y - 6);
             }
 
             ctx.restore();
         }
 
         // 4. Coelho companheiro correndo ao lado do jogador
-        this.renderBunny(ctx);
+        if (!this.currentLevel.hideBunny) this.renderBunny(ctx);
 
         // 5. Jogador correndo e saltando
         this.renderPlayer(ctx);
@@ -1954,6 +2521,71 @@ showGameOverModal() {
 
         // 8. Atmosfera noturna
         this.renderAtmosphereFilter(ctx);
+    }
+
+    renderRunnerShadow(ctx, groundY) {
+        if (!this.currentLevel.runnerShadow) return;
+
+        const frameIndex = Math.floor(Date.now() / 110) % 8;
+        const spriteKey = `sombra_${frameIndex + 1}`;
+        const shadowSprite = sprites.get(spriteKey);
+
+        if (shadowSprite && shadowSprite.complete && shadowSprite.naturalWidth > 0) {
+            const drawH = this.canvas.height * 0.68;
+            const drawW = drawH * (shadowSprite.naturalWidth / shadowSprite.naturalHeight);
+            const x = -drawW * 0.18;
+            const y = groundY - drawH + 10;
+
+            ctx.save();
+            ctx.globalAlpha = 0.96;
+            sprites.draw(ctx, spriteKey, x, y, drawW, drawH, false);
+            ctx.restore();
+            return;
+        }
+
+        // Fallback visual antigo para manter a lateral coberta caso o sprite ainda não tenha carregado.
+        const progress = Math.min(1, this.runnerScore / this.runnerTargetScore);
+        const pulse = Math.sin(Date.now() / 260) * 5;
+        const shadowReach = 112 + progress * 28 + pulse;
+        const shadowGradient = ctx.createLinearGradient(0, 0, shadowReach, 0);
+        shadowGradient.addColorStop(0, 'rgba(3, 5, 16, 0.98)');
+        shadowGradient.addColorStop(0.58, 'rgba(8, 8, 25, 0.86)');
+        shadowGradient.addColorStop(1, 'rgba(12, 10, 30, 0)');
+
+        ctx.save();
+        ctx.fillStyle = shadowGradient;
+        ctx.fillRect(0, 0, shadowReach, this.canvas.height);
+
+        const figureX = 18 + pulse;
+        ctx.fillStyle = 'rgba(4, 5, 18, 0.94)';
+        ctx.beginPath();
+        ctx.moveTo(-24, groundY + 20);
+        ctx.lineTo(-15, groundY - 92);
+        ctx.lineTo(figureX + 16, groundY - 62);
+        ctx.lineTo(figureX + 29, groundY - 142 - Math.sin(Date.now() / 340) * 7);
+        ctx.lineTo(figureX + 48, groundY - 79);
+        ctx.quadraticCurveTo(figureX + 103, groundY - 124, figureX + 119, groundY - 35);
+        ctx.lineTo(figureX + 133, groundY + 20);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = 'rgba(39, 35, 66, 0.72)';
+        ctx.lineWidth = 12;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(figureX + 73, groundY - 45);
+        ctx.quadraticCurveTo(figureX + 118, groundY - 72, shadowReach + 8, groundY - 31);
+        ctx.stroke();
+
+        ctx.fillStyle = 'rgba(130, 122, 164, 0.78)';
+        ctx.shadowColor = 'rgba(159, 149, 196, 0.65)';
+        ctx.shadowBlur = 9;
+        const eyeY = groundY - 91;
+        ctx.beginPath();
+        ctx.ellipse(figureX + 48, eyeY, 3, 2, 0, 0, Math.PI * 2);
+        ctx.ellipse(figureX + 61, eyeY - 1, 3, 2, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
     }
 
     renderRunnerHud(ctx) {
@@ -2006,6 +2638,15 @@ showGameOverModal() {
         const ctx = this.ctx;
         ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
+        const isCutscene = this.state === 'CUTSCENE';
+        document.getElementById('game-container').classList.toggle('cutscene-active', isCutscene);
+        document.getElementById('btn-cutscene-skip').classList.toggle('hidden', !isCutscene);
+
+        if (isCutscene) {
+            this.renderCutscene(ctx);
+            return;
+        }
+
         if (!this.currentLevel) return;
 
         if (this.isSurf) {
@@ -2019,6 +2660,7 @@ showGameOverModal() {
         }
 
         this.renderBackground(ctx);
+        particles.drawSpecters(ctx);
         this.renderPlatforms(ctx);
         this.renderPuzzleElements(ctx);
         this.renderPortal(ctx);
@@ -2028,13 +2670,69 @@ showGameOverModal() {
         if (this.boss) this.renderBoss(ctx);
 
         this.renderPlayerProjectiles(ctx);
-        this.renderBunny(ctx);
+        if (!this.currentLevel.hideBunny) this.renderBunny(ctx);
         this.renderPlayer(ctx);
         particles.draw(ctx, this.cameraX);
 
         if (this.boss) this.renderBossHud(ctx);
 
         this.renderAtmosphereFilter(ctx);
+    }
+
+    renderCutscene(ctx) {
+        const slide = this.cutsceneSlides[this.cutsceneIndex];
+        const slideObject = slide && typeof slide === 'object';
+        const text = slideObject ? (slide.text || '') : (slide || '');
+        const image = slideObject && slide.image ? sprites.get(slide.image) : null;
+        const imageLoaded = image && image.complete && image.naturalWidth > 0;
+        const canvasWidth = this.canvas.width;
+        const canvasHeight = this.canvas.height;
+        const imageTextTop = canvasHeight * 2 / 3;
+
+        if (imageLoaded) {
+            const scale = Math.max(canvasWidth / image.naturalWidth, canvasHeight / image.naturalHeight);
+            const drawWidth = image.naturalWidth * scale;
+            const drawHeight = image.naturalHeight * scale;
+            ctx.drawImage(image, (canvasWidth - drawWidth) / 2, (canvasHeight - drawHeight) / 2, drawWidth, drawHeight);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+            ctx.fillRect(0, imageTextTop, canvasWidth, canvasHeight - imageTextTop);
+        } else {
+            ctx.fillStyle = '#12101c';
+            ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+        }
+
+        const maxWidth = this.canvas.width - 120;
+        const lines = [];
+        const words = String(text).split(/\s+/);
+        let line = '';
+
+        ctx.save();
+        ctx.font = '24px "Segoe UI", Arial, sans-serif';
+        for (const word of words) {
+            const candidate = line ? `${line} ${word}` : word;
+            if (line && ctx.measureText(candidate).width > maxWidth) {
+                lines.push(line);
+                line = word;
+            } else {
+                line = candidate;
+            }
+        }
+        if (line) lines.push(line);
+
+        ctx.fillStyle = '#f5f1ff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const lineHeight = imageLoaded ? 30 : 36;
+        const textCenterY = imageLoaded ? imageTextTop + (canvasHeight - imageTextTop) / 2 : canvasHeight / 2;
+        const firstLineY = textCenterY - ((lines.length - 1) * lineHeight) / 2;
+        lines.forEach((item, index) => {
+            ctx.fillText(item, this.canvas.width / 2, firstLineY + index * lineHeight, maxWidth);
+        });
+
+        ctx.font = '15px "Segoe UI", Arial, sans-serif';
+        ctx.fillStyle = 'rgba(245, 241, 255, 0.65)';
+        ctx.fillText('Clique ou pressione Espaço para continuar', this.canvas.width / 2, this.canvas.height - 34);
+        ctx.restore();
     }
 
     renderBackground(ctx) {
@@ -2170,6 +2868,30 @@ showGameOverModal() {
             }
             ctx.restore();
         }
+
+        for (const plat of this.dynamicPlatforms) {
+            if (plat.visibilityAlpha <= 0) continue;
+            const screenX = plat.x - this.cameraX;
+            if (screenX + plat.w < 0 || screenX > this.canvas.width) continue;
+
+            ctx.save();
+            ctx.globalAlpha = plat.visibilityAlpha;
+            const highlightColor = plat.highlightColor || '#d1c4e9';
+            const platformColor = plat.color || '#6a568c';
+            ctx.shadowColor = highlightColor;
+            ctx.shadowBlur = 10;
+            const gradient = ctx.createLinearGradient(screenX, plat.y, screenX, plat.y + plat.h);
+            gradient.addColorStop(0, highlightColor);
+            gradient.addColorStop(1, platformColor);
+            ctx.fillStyle = gradient;
+            ctx.strokeStyle = plat.borderColor || highlightColor;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.roundRect(screenX, plat.y, plat.w, plat.h, 6);
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+        }
     }
 
     renderPuzzleElements(ctx) {
@@ -2290,34 +3012,48 @@ showGameOverModal() {
         let isLocked = false;
         let lockText = 'PORTAL DA ESPERANÇA';
 
-        if (this.currentLevel.id === 5 && this.keysCollected < this.currentLevel.requiredKeys) {
+        if (this.currentLevel.requiredKeys !== undefined && this.keysCollected < this.currentLevel.requiredKeys) {
             isLocked = true;
             lockText = `TRANCADO (${this.keysCollected}/3)`;
-        } else if (this.currentLevel.id === 6 && this.shrinesLit < this.currentLevel.requiredShrines) {
+        } else if (this.currentLevel.requiredShrines !== undefined && this.shrinesLit < this.currentLevel.requiredShrines) {
             isLocked = true;
             lockText = `ACENDA AS 3 CHAMAS (${this.shrinesLit}/3)`;
         }
 
+        if (this.currentLevel.id === 9 && this.boss && this.boss.state !== 'DEFEATED') {
+            isLocked = true;
+            lockText = 'DERROTE A GRANDE SOMBRA';
+        }
+
+        const portalSpriteKey = isLocked ? 'portal_fechado' : 'portal_aberto';
+        const portalImage = sprites.get(portalSpriteKey);
+        const portalHeight = 120;
+        const portalAspectRatio = portalImage && portalImage.naturalWidth > 0 && portalImage.naturalHeight > 0
+            ? portalImage.naturalWidth / portalImage.naturalHeight
+            : 2 / 3;
+        const portalWidth = portalHeight * portalAspectRatio;
+        const portalCenterX = screenX + 35;
+        const portalY = groundY - portalHeight;
+
         const portalColor = isLocked ? 'rgba(158, 158, 158,' : 'rgba(255, 235, 59,';
-        const gradient = ctx.createRadialGradient(screenX + 35, groundY - 45, 10, screenX + 35, groundY - 45, 65);
+        const glowCenterY = groundY - portalHeight / 2;
+        const gradient = ctx.createRadialGradient(portalCenterX, glowCenterY, 10, portalCenterX, glowCenterY, 65);
         gradient.addColorStop(0, `${portalColor} ${0.7 + pulse * 0.3})`);
         gradient.addColorStop(0.6, `${portalColor} ${0.3 + pulse * 0.2})`);
         gradient.addColorStop(1, `${portalColor} 0)`);
 
         ctx.fillStyle = gradient;
         ctx.beginPath();
-        ctx.arc(screenX + 35, groundY - 45, 65, 0, Math.PI * 2);
+        ctx.arc(portalCenterX, glowCenterY, 65, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.font = '40px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(isLocked ? '🔒' : '🌻', screenX + 35, groundY - 20);
+        sprites.draw(ctx, portalSpriteKey, portalCenterX - portalWidth / 2, portalY, portalWidth, portalHeight);
 
         ctx.font = 'bold 12px "Segoe UI", Arial';
         ctx.fillStyle = isLocked ? '#cfd8dc' : '#fffae6';
         ctx.shadowColor = '#000';
         ctx.shadowBlur = 4;
-        ctx.fillText(lockText, screenX + 35, groundY - 75);
+        ctx.fillText(lockText, portalCenterX, portalY - 8);
         ctx.restore();
     }
 
@@ -2348,11 +3084,6 @@ showGameOverModal() {
             const drawY = obs.y + (obs.hoverOffset || 0);
 
             ctx.save();
-            ctx.fillStyle = 'rgba(156, 136, 255, 0.18)';
-            ctx.beginPath();
-            ctx.arc(screenX + obs.w / 2, drawY + obs.h / 2, obs.w * 0.6, 0, Math.PI * 2);
-            ctx.fill();
-
             const flip = obs.vx < 0;
             const visualScale = 0.65;
             const visualW = obs.w * visualScale;
@@ -2385,16 +3116,20 @@ showGameOverModal() {
             return `${prefix}${frameIndex + 1}`;
         };
 
-        if (this.isRunner && b.isGrounded) {
-            spriteKey = frame('bunny_walk', 6, 120);
-        } else if (!b.isGrounded) {
-            spriteKey = (Math.floor(Date.now() / 110) % 2 === 0) ? 'bunny_jump2' : 'bunny_jump3';
+        if (b.isGrounded === false) {
+            spriteKey = frame('bunny_jump', 3, 110);
             flip = b.vx * b.facing <= 0 ? false : b.facing === -1;
-        } else if (Math.abs(b.vx) > 0.3) {
-            spriteKey = frame('bunny_walk', 6, 120);
+        } else if (b.isGrounded === true && b.vx !== 0) {
+            spriteKey = frame('bunny_walk', 3, 120);
             flip = b.facing === -1;
         } else {
-            spriteKey = frame('bunny_front', 6, 170);
+            spriteKey = frame('bunny_idle', 3, 360);
+        }
+
+        const debugTime = Date.now();
+        if (!this.bunnyDebugLastLog || debugTime - this.bunnyDebugLastLog >= 500) {
+            console.log('bunny:', b.isGrounded, b.vx, b.vy, spriteKey);
+            this.bunnyDebugLastLog = debugTime;
         }
 
         const drawW = 60;
@@ -2490,6 +3225,24 @@ showGameOverModal() {
 
         const spriteOffsetY = 6;
         sprites.draw(ctx, spriteKey, screenX, p.y + spriteOffsetY, p.w, p.h, flip);
+        this.renderShieldGlow(ctx, screenX, p.y + spriteOffsetY, p.w, p.h);
+        ctx.restore();
+    }
+
+    renderShieldGlow(ctx, x, y, w, h) {
+        if (this.shieldTimer <= 0) return;
+
+        const pulse = 0.72 + Math.sin(Date.now() / 85) * 0.12;
+        ctx.save();
+        ctx.strokeStyle = `rgba(128, 216, 255, ${pulse})`;
+        ctx.fillStyle = 'rgba(128, 216, 255, 0.12)';
+        ctx.lineWidth = 3;
+        ctx.shadowColor = '#80d8ff';
+        ctx.shadowBlur = 18;
+        ctx.beginPath();
+        ctx.ellipse(x + w / 2, y + h / 2, w * 0.72, h * 0.58, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
         ctx.restore();
     }
 
@@ -2499,10 +3252,7 @@ showGameOverModal() {
     updateBoss() {
         const boss = this.boss;
         if (!boss) return;
-
-        // A posição do Boss permanece fixa; apenas o desenho recebe animação de idle.
-        boss.x = boss.baseX;
-        boss.y = boss.baseY + (boss.shakeY || 0);
+        const particleColor = boss.particleColor || '#9c27b0';
 
         // Temporizador de flash ao ser atingido pela Onda de Luz
         if (boss.flashTimer > 0) {
@@ -2518,6 +3268,15 @@ showGameOverModal() {
             return;
         }
 
+        if (boss.spritePrefix === 'boss') {
+            this.updateFinalBossCycle(boss, particleColor);
+            return;
+        }
+
+        // A posição do Narciso permanece fixa; apenas o desenho recebe animação de idle.
+        boss.x = boss.baseX;
+        boss.y = boss.baseY + (boss.shakeY || 0);
+
         // Temporizador de ataques estilo Cuphead
         boss.attackCooldown -= 0.016;
 
@@ -2530,7 +3289,7 @@ showGameOverModal() {
                 boss.state = 'IDLE';
                 boss.attackCooldown = 3.2;
                 audio.playJump();
-                particles.emitSparks(boss.x + 40, 460, 25, '#9c27b0');
+                particles.emitSparks(boss.x + 40, 460, 25, particleColor);
                 this.bossShockwaves.push({
                     x: boss.x - 20,
                     y: 435,
@@ -2551,10 +3310,24 @@ showGameOverModal() {
                 audio.playWave();
                 // Dispara 2 esferas de sombra em alturas diferentes
                 this.bossProjectiles.push(
-                    { x: boss.x - 10, y: 390, vx: -3.8, radius: 18, color: '#7b2cbf' },
-                    { x: boss.x - 30, y: 280, vx: -3.0, radius: 16, color: '#ba68c8' }
+                    {
+                        x: boss.x - 10,
+                        y: 390,
+                        vx: -3.8,
+                        radius: 18,
+                        color: particleColor,
+                        canBeDodgedByCrouching: boss.spritePrefix === 'narciso'
+                    },
+                    {
+                        x: boss.x - 30,
+                        y: 280,
+                        vx: -3.0,
+                        radius: 16,
+                        color: particleColor,
+                        canBeDodgedByCrouching: boss.spritePrefix === 'narciso'
+                    }
                 );
-                particles.emitSparks(boss.x - 10, 390, 12, '#ba68c8');
+                particles.emitSparks(boss.x - 10, 390, 12, particleColor);
             }
             return;
         }
@@ -2565,6 +3338,9 @@ showGameOverModal() {
                 // Ataque 1: Disparo de Esferas de Sombra
                 boss.state = 'TELEGRAPH_SHOOT';
                 boss.attackTimer = 0.65;
+                if (boss.spritePrefix === 'narciso') {
+                    this.showPhraseBanner('⚠️ Abaixe-se para desviar das sombras altas!');
+                }
             } else if (roll < 0.80) {
                 // Ataque 2: Pancada no Chão (Slam)
                 boss.state = 'TELEGRAPH_SLAM';
@@ -2584,32 +3360,150 @@ showGameOverModal() {
                     minX: 40,
                     maxX: boss.x - 10
                 });
-                particles.emitSparks(boss.x - 20, 412, 10, '#ba68c8');
+                particles.emitSparks(boss.x - 20, 412, 10, particleColor);
             }
         }
     }
 
+    updateFinalBossCycle(boss, particleColor) {
+        const deltaTime = 0.016;
+        boss.phaseTimer -= deltaTime;
+        boss.phaseElapsed += deltaTime;
+        boss.state = boss.phase;
+
+        if (boss.phase === 'RIGHT_CAST') {
+            boss.castTimer -= deltaTime;
+            boss.minionTimer -= deltaTime;
+
+            if (boss.castTimer <= 0) {
+                this.fireFinalBossProjectiles(boss, particleColor);
+                boss.castTimer = 0.95;
+            }
+            if (boss.minionTimer <= 0) {
+                this.spawnFinalBossMinion(boss, particleColor);
+                boss.minionTimer = 1.6;
+            }
+        } else if (boss.phase === 'TRANSIT_LEFT') {
+            this.moveFinalBossDuringPhase(boss);
+        } else if (boss.phase === 'CENTER_BURST') {
+            this.moveFinalBossDuringPhase(boss);
+            if (!boss.burstTriggered && boss.phaseElapsed >= 0.55) {
+                this.fireFinalBossShockwaves(boss, particleColor);
+                boss.burstTriggered = true;
+            }
+        }
+
+        if (boss.phaseTimer > 0) return;
+
+        if (boss.phase === 'RIGHT_CAST') {
+            this.enterFinalBossPhase(boss, 'TRANSIT_LEFT', 1.2, 50, 460 - boss.h);
+        } else if (boss.phase === 'TRANSIT_LEFT') {
+            this.enterFinalBossPhase(boss, 'CENTER_BURST', 2.5, 400 + (160 - boss.w) / 2, 160 - boss.h);
+        } else if (boss.phase === 'CENTER_BURST') {
+            this.enterFinalBossPhase(boss, 'LEFT_REST', 2, 50, 460 - boss.h);
+        } else {
+            this.enterFinalBossPhase(boss, 'RIGHT_CAST', 4, this.canvas.width - boss.w - 50, 460 - boss.h);
+            boss.castTimer = 0.35;
+            boss.minionTimer = 0.8;
+        }
+    }
+
+    enterFinalBossPhase(boss, phase, duration, targetX, targetY) {
+        boss.phase = phase;
+        boss.state = phase;
+        boss.phaseTimer = duration;
+        boss.phaseElapsed = 0;
+        boss.phaseStartX = boss.x;
+        boss.phaseStartY = boss.y;
+        boss.phaseTargetX = targetX;
+        boss.phaseTargetY = targetY;
+        boss.burstTriggered = false;
+    }
+
+    moveFinalBossDuringPhase(boss) {
+        const moveDuration = boss.phase === 'TRANSIT_LEFT' ? 1.2 : 0.55;
+        const progress = Math.min(1, boss.phaseElapsed / moveDuration);
+        boss.x = boss.phaseStartX + (boss.phaseTargetX - boss.phaseStartX) * progress;
+        boss.y = boss.phaseStartY + (boss.phaseTargetY - boss.phaseStartY) * progress;
+    }
+
+    fireFinalBossProjectiles(boss, particleColor) {
+        audio.playWave();
+        this.bossProjectiles.push(
+            {
+                x: boss.x - 10,
+                y: 390,
+                vx: -3.8,
+                radius: 18,
+                color: particleColor
+            },
+            {
+                x: boss.x - 30,
+                y: 280,
+                vx: -3.0,
+                radius: 16,
+                color: particleColor
+            }
+        );
+        particles.emitSparks(boss.x - 10, 390, 12, particleColor);
+    }
+
+    spawnFinalBossMinion(boss, particleColor) {
+        audio.playWave();
+        this.obstacles.push({
+            type: 'obs_isolamento',
+            name: 'Dúvida Rastejante',
+            x: boss.x - 20,
+            y: 412,
+            w: 50,
+            h: 55,
+            vx: -0.7,
+            minX: 40,
+            maxX: boss.x - 10
+        });
+        particles.emitSparks(boss.x - 20, 412, 10, particleColor);
+    }
+
+    fireFinalBossShockwaves(boss, particleColor) {
+        const centerX = boss.x + boss.w / 2;
+        audio.playJump();
+        particles.emitSparks(centerX, 435, 25, particleColor);
+        this.bossShockwaves.push(
+            { x: centerX, y: 435, w: 32, h: 25, vx: 4.2 },
+            { x: centerX - 32, y: 435, w: 32, h: 25, vx: -4.2 }
+        );
+        this.showPhraseBanner('⚠️ Salte para desviar das ondas que avançam dos dois lados!');
+    }
+
     getBossProfileKey() {
         const boss = this.boss;
-        if (!boss || boss.state === 'DEFEATED') return 'boss_perfil_3';
+        const prefix = boss?.spritePrefix || 'boss';
+        if (!boss || boss.state === 'DEFEATED') return `${prefix}_perfil_3`;
 
-        if (boss.hp > boss.maxHp * 0.67) return 'boss_perfil_1';
-        if (boss.hp > boss.maxHp * 0.34) return 'boss_perfil_2';
-        return 'boss_perfil_3';
+        if (boss.hp > boss.maxHp * 0.67) return `${prefix}_perfil_1`;
+        if (boss.hp > boss.maxHp * 0.34) return `${prefix}_perfil_2`;
+        return `${prefix}_perfil_3`;
     }
 
     getBossDamageKey() {
         const boss = this.boss;
-        if (!boss || boss.state === 'DEFEATED') return 'boss_dano_3';
+        const prefix = boss?.spritePrefix || 'boss';
+        if (!boss) return 'boss_dano_3';
 
-        if (boss.hp > boss.maxHp * 0.67) return 'boss_dano_1';
-        if (boss.hp > boss.maxHp * 0.34) return 'boss_dano_2';
-        return 'boss_dano_3';
+        if (prefix === 'narciso') {
+            return boss.hp > boss.maxHp * 0.5 ? `${prefix}_dano_1` : `${prefix}_dano_2`;
+        }
+        if (boss.state === 'DEFEATED') return `${prefix}_dano_3`;
+
+        if (boss.hp > boss.maxHp * 0.67) return `${prefix}_dano_1`;
+        if (boss.hp > boss.maxHp * 0.34) return `${prefix}_dano_2`;
+        return `${prefix}_dano_3`;
     }
 
     damageBoss(amount = 1) {
         const boss = this.boss;
         if (!boss || boss.state === 'DEFEATED') return;
+        if (boss.spritePrefix === 'boss' && boss.phase !== 'RIGHT_CAST' && boss.phase !== 'LEFT_REST') return;
 
         boss.hp -= amount;
         boss.flashTimer = 0.25;
@@ -2645,7 +3539,8 @@ showGameOverModal() {
             }
 
             // Acertou o Boss
-            if (this.boss && this.boss.state !== 'DEFEATED') {
+            if (this.boss && this.boss.state !== 'DEFEATED' &&
+                (this.boss.spritePrefix !== 'boss' || this.boss.phase === 'RIGHT_CAST' || this.boss.phase === 'LEFT_REST')) {
                 const b = this.boss;
                 if (proj.x > b.x && proj.x < b.x + b.w && proj.y > b.y && proj.y < b.y + b.h) {
                     this.damageBoss(1);
@@ -2675,6 +3570,7 @@ showGameOverModal() {
 
     updateBossAttacks() {
         const p = this.player;
+        const particleColor = this.boss?.particleColor || '#9c27b0';
 
         // 1. Projéteis de Sombra do Boss
         for (let i = this.bossProjectiles.length - 1; i >= 0; i--) {
@@ -2682,12 +3578,14 @@ showGameOverModal() {
             bp.x += bp.vx;
 
             if (Math.random() < 0.3) {
-                particles.emitSparks(bp.x, bp.y, 2, '#7b2cbf');
+                particles.emitSparks(bp.x, bp.y, 2, particleColor);
             }
 
-            // Dano no Jogador
-            const dist = Math.hypot((p.x + p.w / 2) - bp.x, (p.y + p.h / 2) - bp.y);
-            if (dist < bp.radius + p.w / 2) {
+            // Abaixar reduz o hitbox contra todos os projéteis aéreos do chefe.
+            const playerBox = this.getBossAttackPlayerBox();
+            const nearestX = Math.max(playerBox.x, Math.min(bp.x, playerBox.x + playerBox.w));
+            const nearestY = Math.max(playerBox.y, Math.min(bp.y, playerBox.y + playerBox.h));
+            if (Math.hypot(nearestX - bp.x, nearestY - bp.y) < bp.radius) {
                 this.playerTakeDamage(null);
                 this.bossProjectiles.splice(i, 1);
                 continue;
@@ -2703,13 +3601,15 @@ showGameOverModal() {
             const sw = this.bossShockwaves[i];
             sw.x += sw.vx;
 
-            // Dano apenas se o jogador estiver no chão
-            if (p.x + p.w > sw.x && p.x < sw.x + sw.w && p.y + p.h >= sw.y) {
+            const playerBox = this.getBossAttackPlayerBox();
+            if (this.checkAABB(playerBox, sw)) {
                 this.playerTakeDamage(null);
-                particles.emitSparks(p.x + p.w / 2, p.y + p.h, 10, '#d500f9');
+                particles.emitSparks(p.x + p.w / 2, p.y + p.h, 10, particleColor);
             }
 
-            if (sw.x < -60) {
+            const pastLeftEdge = sw.vx < 0 && sw.x < -60;
+            const pastRightEdge = sw.vx > 0 && sw.x > (this.currentLevel?.width || this.canvas.width) + 60;
+            if (pastLeftEdge || pastRightEdge) {
                 this.bossShockwaves.splice(i, 1);
             }
         }
@@ -2737,6 +3637,7 @@ showGameOverModal() {
     renderBoss(ctx) {
         const boss = this.boss;
         if (!boss) return;
+        const particleColor = boss.particleColor || '#9c27b0';
         const screenX = boss.x - this.cameraX;
         const idleTime = Date.now() * BOSS_IDLE_SPEED + boss.movePhase;
         const idleBob = Math.sin(idleTime * 1.7) * BOSS_IDLE_BOB;
@@ -2748,7 +3649,8 @@ showGameOverModal() {
         // Sombra no chão
         ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
         ctx.beginPath();
-        ctx.ellipse(screenX + boss.w / 2, 460, boss.w * 0.45, 14, 0, 0, Math.PI * 2);
+        const shadowY = boss.spritePrefix === 'boss' ? boss.y + boss.h : 460;
+        ctx.ellipse(screenX + boss.w / 2, shadowY, boss.w * 0.45, 14, 0, 0, Math.PI * 2);
         ctx.fill();
 
         // Alerta de Telegrafia estilo Cuphead (!)
@@ -2772,26 +3674,39 @@ showGameOverModal() {
             ctx.font = '90px sans-serif';
             ctx.textAlign = 'center';
             ctx.fillText('🌻', screenX + boss.w / 2, boss.y + boss.h / 2 + 35);
+        } else if (boss.spritePrefix === 'boss' && (boss.phase === 'TRANSIT_LEFT' || boss.phase === 'CENTER_BURST')) {
+            const centerX = screenX + boss.w / 2;
+            const centerY = boss.y + boss.h / 2;
+            const radius = Math.max(boss.w, boss.h) * 0.48;
+            const shadowGradient = ctx.createRadialGradient(centerX, centerY, radius * 0.08, centerX, centerY, radius);
+            shadowGradient.addColorStop(0, 'rgba(8, 4, 16, 0.98)');
+            shadowGradient.addColorStop(0.58, 'rgba(24, 8, 39, 0.96)');
+            shadowGradient.addColorStop(0.82, 'rgba(62, 20, 86, 0.82)');
+            shadowGradient.addColorStop(1, 'rgba(62, 20, 86, 0)');
+            ctx.shadowColor = '#4a176b';
+            ctx.shadowBlur = 26;
+            ctx.fillStyle = shadowGradient;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+            ctx.fill();
         } else {
-            const idleFrames = ['boss_perfil_1', 'boss_perfil_2', 'boss_perfil_3'];
-            const idleFrame = Math.floor((idleTime / 1.1 + flamePulse) % idleFrames.length);
-            const profileKey = idleFrames[idleFrame];
+            const profileKey = `${boss.spritePrefix}_perfil_${Math.floor((idleTime / 1.1 + flamePulse) % 3) + 1}`;
             const damageKey = this.getBossDamageKey();
-            const profileImg = sprites.get(profileKey);
-            const damageImg = sprites.get(damageKey);
+            const attackFrameCount = 4;
+            const attackFrameIndex = Math.floor(Date.now() / 100);
+            const attackKey = `${boss.spritePrefix}_golpe_${(attackFrameIndex % attackFrameCount) + 1}`;
+            const displayKey = boss.spritePrefix === 'narciso'
+                ? profileKey
+                : boss.flashTimer > 0
+                    ? damageKey
+                    : boss.state === 'TELEGRAPH_SLAM'
+                        ? attackKey
+                        : profileKey;
 
             ctx.save();
             ctx.translate(screenX + boss.w / 2, boss.y + boss.h / 2 + idleBob);
             ctx.rotate(idleTilt);
-
-            if (damageImg && damageImg.complete && damageImg.naturalWidth > 0 && boss.flashTimer > 0) {
-                sprites.draw(ctx, damageKey, -boss.w / 2, -boss.h / 2, boss.w, boss.h, false);
-            } else if (profileImg && profileImg.complete && profileImg.naturalWidth > 0) {
-                sprites.draw(ctx, profileKey, -boss.w / 2, -boss.h / 2, boss.w, boss.h, false);
-            } else {
-                const spriteToUse = 'boss_shadow';
-                sprites.draw(ctx, spriteToUse, -boss.w / 2, -boss.h / 2, boss.w, boss.h, false);
-            }
+            sprites.draw(ctx, displayKey, -boss.w / 2, -boss.h / 2, boss.w, boss.h, false);
 
             if (boss.flashTimer > 0) {
                 ctx.globalCompositeOperation = 'source-atop';
@@ -2807,14 +3722,14 @@ showGameOverModal() {
         for (let bp of this.bossProjectiles) {
             const bpX = bp.x - this.cameraX;
             ctx.save();
-            ctx.shadowColor = bp.color || '#7b2cbf';
+            ctx.shadowColor = bp.color || particleColor;
             ctx.shadowBlur = 14;
-            ctx.fillStyle = bp.color || '#7b2cbf';
+            ctx.fillStyle = bp.color || particleColor;
             ctx.beginPath();
             ctx.arc(bpX, bp.y, bp.radius, 0, Math.PI * 2);
             ctx.fill();
 
-            ctx.fillStyle = '#e0aaff';
+            ctx.fillStyle = particleColor;
             ctx.beginPath();
             ctx.arc(bpX, bp.y, bp.radius * 0.5, 0, Math.PI * 2);
             ctx.fill();
@@ -2825,12 +3740,12 @@ showGameOverModal() {
         for (let sw of this.bossShockwaves) {
             const swX = sw.x - this.cameraX;
             ctx.save();
-            ctx.shadowColor = '#d500f9';
+            ctx.shadowColor = particleColor;
             ctx.shadowBlur = 12;
             const grad = ctx.createLinearGradient(swX, sw.y, swX + sw.w, sw.y + sw.h);
             grad.addColorStop(0, '#ffffff');
-            grad.addColorStop(0.5, '#d500f9');
-            grad.addColorStop(1, '#4a148c');
+            grad.addColorStop(0.5, particleColor);
+            grad.addColorStop(1, particleColor);
             ctx.fillStyle = grad;
             ctx.beginPath();
             ctx.moveTo(swX + sw.w, sw.y + sw.h);
@@ -2906,6 +3821,7 @@ showGameOverModal() {
                 if (!currentTime) currentTime = performance.now();
                 let delta = currentTime - lastTime;
                 lastTime = currentTime;
+                this.frameDeltaMs = delta;
 
                 // Evitar acúmulo anormal se o navegador for pausado ou aba perder foco
                 if (delta > 250) delta = 250;

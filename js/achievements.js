@@ -11,12 +11,6 @@ class AchievementManager {
                 desc: 'Iniciou a caminhada ao lado do seu coelhinho companheiro.',
                 icon: '🌱'
             },
-            'voice_of_care': {
-                id: 'voice_of_care',
-                title: 'Coração Aberto 💬',
-                desc: 'Parou para ouvir e conversar com uma pessoa amiga.',
-                icon: '💛'
-            },
             'bunny_friend': {
                 id: 'bunny_friend',
                 title: 'Sintonia Afetiva 🐰',

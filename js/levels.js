@@ -1,5 +1,5 @@
 /**
- * LevelData - Definição das 6 fases do Setembro Amarelo
+ * LevelData - Definição das 9 fases do Setembro Amarelo
  * 
  * Fases 1 a 4: Plataforma e Superação de Sintomas
  * Fase 5: O Santuário da Mente (Puzzle Cooperativo com o Coelho - Placas de Pressão & Chaves)
@@ -10,9 +10,15 @@ const GAME_LEVELS = [
         id: 1,
         name: "Fase 1: A Floresta dos Sentimentos",
         subtitle: "Acolhendo os sentimentos e combatendo o primeiro sintoma: a solidão.",
+        cutscene: [
+            { image: 'cutscene_fase1_1', text: 'Na escola, Maya foi deixada de fora. Em casa, tentou falar... mas ninguém pareceu ouvir. Mais um dia guardado em silêncio.' },
+            { image: 'cutscene_fase1_2', text: 'No quarto, as lágrimas vêm sem pedir licença. O cansaço pesa mais que a tristeza... e o chão parece desaparecer.' },
+            { image: 'cutscene_fase1_3', text: 'Ela acorda em uma floresta escura, cercada de medo e solidão. Sem esperança de encontrar a saída... surge uma luz suave, e com ela, um ser mágico que a acolhe.' }
+        ],
         bgKey: "bg_fase1",
         width: 2400,
         groundY: 460,
+        parTime: 120,
         portalX: 2260,
         platforms: [
             // Chão com buracos — 2 gaps para o jogador pular
@@ -50,22 +56,23 @@ const GAME_LEVELS = [
         bgKey: "bg_fase2",
         width: 2600,
         groundY: 460,
+        parTime: 140,
         portalX: 2460,
         platforms: [
             // Chão com buracos — 3 gaps para pular
             { x: 0, y: 460, w: 580, h: 80 },
             { x: 680, y: 460, w: 480, h: 80 },
             { x: 1260, y: 460, w: 600, h: 80 },
-            { x: 1960, y: 460, w: 640, h: 80 },
-            // Plataformas elevadas
-            { x: 260, y: 360, w: 180, h: 24 },
-            { x: 500, y: 290, w: 160, h: 24 },
-            { x: 740, y: 230, w: 160, h: 24 },
-            { x: 970, y: 340, w: 180, h: 24 },
-            { x: 1240, y: 260, w: 190, h: 24 },
-            { x: 1510, y: 330, w: 160, h: 24 },
-            { x: 1760, y: 250, w: 180, h: 24 },
-            { x: 2040, y: 340, w: 220, h: 24 }
+            { x: 1960, y: 460, w: 640, h: 80 }
+        ],
+        dynamicPlatforms: [
+            { x: 260, y: 360, w: 160, h: 20, moveAxis: 'x', moveRange: [240, 370], moveSpeed: 38, color: '#242936', highlightColor: '#50596b' },
+            { x: 520, y: 290, w: 170, h: 20, moveAxis: 'y', moveRange: [250, 325], moveSpeed: 26, color: '#242936', highlightColor: '#50596b' },
+            { x: 820, y: 350, w: 150, h: 20, moveAxis: 'x', moveRange: [790, 950], moveSpeed: 44, color: '#242936', highlightColor: '#50596b' },
+            { x: 1090, y: 270, w: 180, h: 20, moveAxis: 'y', moveRange: [225, 315], moveSpeed: 30, color: '#242936', highlightColor: '#50596b' },
+            { x: 1380, y: 340, w: 160, h: 20, moveAxis: 'x', moveRange: [1350, 1520], moveSpeed: 42, color: '#242936', highlightColor: '#50596b' },
+            { x: 1690, y: 260, w: 180, h: 20, moveAxis: 'y', moveRange: [215, 305], moveSpeed: 32, color: '#242936', highlightColor: '#50596b' },
+            { x: 2010, y: 350, w: 200, h: 20, moveAxis: 'x', moveRange: [1980, 2200], moveSpeed: 46, color: '#242936', highlightColor: '#50596b' }
         ],
         obstacles: [
             { type: 'obs_humilhacao', name: 'Autocrítica', x: 330, y: 312, w: 60, h: 66, vx: 0.20, minX: 270, maxX: 430 },
@@ -86,20 +93,33 @@ const GAME_LEVELS = [
     {
         id: 3,
         name: "Fase 3: Corrida da Superação",
-        subtitle: "Desvie dos objetos, preserve suas vidas e alcance 1000 pontos para avançar!",
+        subtitle: "Corra da escuridão, desvie dos objetos e alcance 1000 pontos para avançar!",
+        cutscene: [
+            { image: 'cutscene_fase3_1', text: 'Maya encontra uma brecha entre as árvores... mas não está sozinha. Uma sombra pesada a persegue, sussurrando tudo que ela mais teme ouvir. Ela precisa correr — e não pode olhar para trás.' }
+        ],
         bgKey: "bg_fase3",
         width: 960,
         groundY: 460,
+        parTime: 90,
         isRunnerLevel: true,
+        hideBunny: true,
+        runnerShadow: true,
         targetScore: 1000,
-        runnerBaseSpeed: 3.8,
-        runnerMidSpeed: 5.5,
-        runnerMaxSpeed: 8.8,
+        runnerBaseSpeed: 5.0,
+        runnerMidSpeed: 7.5,
+        runnerMaxSpeed: 11.0,
+        runnerRiskChance: 0.18,
         runnerSpawnMin: 1.8,
         runnerSpawnMax: 2.8,
-        runnerFlyingChance: 0.28,
-        runnerCollectibleChance: 0,
+        runnerFlyingChance: 0,
+        runnerCollectibleChance: 0.45,
         runnerHoleChance: 0,
+        runnerObstacleTypes: [
+            { type: 'runner_obstacle1', name: 'Obstáculo', w: 52, h: 58 },
+            { type: 'runner_obstacle2', name: 'Obstáculo', w: 50, h: 58 },
+            { type: 'runner_obstacle3', name: 'Obstáculo', w: 58, h: 58 },
+            { type: 'runner_obstacle4', name: 'Obstáculo', w: 58, h: 60 }
+        ],
         platforms: [
             { x: 0, y: 460, w: 960, h: 80 }
         ],
@@ -110,10 +130,16 @@ const GAME_LEVELS = [
         id: 4,
         name: "Fase 4: Surf da Esperança",
         subtitle: "Desvie das ondas e boias, salte a espuma e alcance 1000 pontos sem sair da prancha.",
+        cutscene: [
+            { image: 'cutscene_fase4_1', text: 'A sombra desaparece assim que Maya alcança a margem do lago — mas na correria, ela perde de vista seu fiel amigo. Sozinha, ela precisa atravessar as águas até a margem oposta, onde algo a espera.' }
+        ],
         bgKey: "bg_fase4",
         width: 960,
         groundY: 460,
+        parTime: 100,
         isSurfLevel: true,
+        waterTextureKey: 'lago_agua',
+        skyBackgroundKey: 'lago_ceu',
         surfTargetScore: 1000,
         surfBaseSpeed: 4.5,
         surfMaxSpeed: 8.2,
@@ -127,12 +153,56 @@ const GAME_LEVELS = [
     },
     {
         id: 5,
+        name: "Fase 4.5: A Saída do Lago",
+        subtitle: "Enfrente Narciso das Águas Turvas — use a Onda de Luz [E] apenas quando ele se expuser!",
+        cutscene: [
+            { image: 'cutscene_fase5_1', text: 'Na margem oposta, alguém a aguarda. Um ser que um dia tentou se moldar ao que o mundo diz que se deve ser: rico, belo, perfeito. Mas quanto mais se enfeitava por fora, mais a dor crescia por dentro — até restar apenas a máscara, e o vazio embaixo dela.' }
+        ],
+        bgKey: "lago_ceu",
+        width: 960,
+        groundY: 460,
+        parTime: 125,
+        portalX: 440,
+        isBossLevel: true,
+        hideBunny: true,
+        platforms: [
+            { x: 0, y: 460, w: 960, h: 80 }
+        ],
+        dynamicPlatforms: [
+            { x: 50, y: 405, w: 120, h: 18, moveAxis: 'x', moveRange: [35, 230], moveSpeed: 48, visibleFor: 4, hiddenFor: 2 },
+            { x: 280, y: 315, w: 130, h: 18, moveAxis: 'y', moveRange: [245, 340], moveSpeed: 30, visibleFor: 5, hiddenFor: 2 },
+            { x: 445, y: 395, w: 125, h: 18, moveAxis: 'x', moveRange: [390, 625], moveSpeed: 54, visibleFor: 3.5, hiddenFor: 2 },
+            { x: 700, y: 310, w: 115, h: 18, moveAxis: 'y', moveRange: [250, 365], moveSpeed: 34, visibleFor: 4.5, hiddenFor: 2 }
+        ],
+        boss: {
+            name: "Narciso das Águas Turvas",
+            title: "O Rosto Perfeito",
+            spritePrefix: "narciso",
+            studentSpriteKey: "boss_aluno",
+            x: 690,
+            y: 220,
+            w: 200,
+            h: 220,
+            maxHp: 6,
+            hp: 6,
+            particleColor: "#8e7cc3"
+        },
+        obstacles: [],
+        items: []
+    },
+    {
+        id: 6,
         name: "Fase 5: O Santuário da Mente (Puzzle)",
         subtitle: "Use [F] para coordenar seu coelho nas placas de pressão e encontrar as 3 Chaves da Clareza.",
+        cutscene: [
+            { image: 'cutscene_fase6_1', text: 'Do outro lado do lago, um focinho familiar a espera. Seu amigo encontrou um caminho — mais longo, mais difícil, mas seguro. Maya sorri: já não é a mesma menina que caiu na escuridão. Juntos, seguem em frente.' }
+        ],
         bgKey: "bg_fase5",
         width: 2200,
         groundY: 460,
+        parTime: 150,
         portalX: 2060,
+        maxJumps: 1,
         requiredKeys: 3, // Necessário 3 chaves para abrir o portal final
         platforms: [
             // Chão base
@@ -173,12 +243,13 @@ const GAME_LEVELS = [
         ],
     },
     {
-        id: 6,
+        id: 7,
         name: "Fase 6: Caminhos Invisíveis de Esperança (Puzzle Final)",
         subtitle: "Use a Onda de Luz [E] para revelar as plataformas invisíveis e acender as 3 Chamas da Vida!",
         bgKey: "bg_fase6",
         width: 2500,
         groundY: 460,
+        parTime: 160,
         portalX: 2360,
         requiredShrines: 3, // Necessário acender os 3 altares
         platforms: [
@@ -222,31 +293,39 @@ const GAME_LEVELS = [
         ]
     },
     {
-        id: 7,
+        id: 9,
         name: "Fase 7: O Grande Desafio da Superação (Chefe Final)",
         subtitle: "Desvie dos ataques do Boss e use sua Onda de Luz [E] para transformar a dor em acolhimento!",
+        cutscene: [
+            { image: 'cutscene_fase9_1', text: 'No fim do caminho, uma presença imensa a aguarda — o peso de tudo que já quis fazê-la desistir. "Fique aqui", ele sussurra, "é mais fácil não seguir." Mas Maya já sabe: por mais pesado que seja o caminho, a vida ainda vale a pena ser vivida.' }
+        ],
         bgKey: "bg_fase7",
         width: 960,
         groundY: 460,
+        parTime: 120,
         portalX: 440,
         isBossLevel: true,
         platforms: [
             // Chão base da arena
             { x: 0, y: 460, w: 960, h: 80 },
-            // Plataformas elevadas para esquiva dos ataques (estilo Cuphead)
-            { x: 100, y: 350, w: 150, h: 22 },
-            { x: 290, y: 260, w: 160, h: 22 },
-            { x: 490, y: 340, w: 140, h: 22 }
+            // Plataforma fixa para a fase central do chefe
+            { x: 400, y: 160, w: 160, h: 20 }
+        ],
+        dynamicPlatforms: [
+            { x: 100, y: 350, w: 150, h: 22, visibleFor: 4, hiddenFor: 2 },
+            { x: 290, y: 260, w: 160, h: 22, visibleFor: 4, hiddenFor: 2 },
+            { x: 490, y: 340, w: 140, h: 22, visibleFor: 4, hiddenFor: 2 }
         ],
         boss: {
             name: "A Grande Sombra do Desânimo",
             title: "Desafio Final das Emoções",
+            spritePrefix: "boss",
             spriteKey: "boss_shadow",
             studentSpriteKey: "boss_aluno",
-            x: 690,
-            y: 220,
-            w: 230,
-            h: 240,
+            x: 840,
+            y: 365,
+            w: 70,
+            h: 95,
             maxHp: 8,
             hp: 8
         },
@@ -256,3 +335,11 @@ const GAME_LEVELS = [
         ]
     }
 ];
+
+const ENDING_CUTSCENE = [
+    { image: 'cutscene_ending_1', text: 'Maya abre os olhos... e está em seu quarto novamente. A luz da manhã entra pela janela. Ela ainda carrega o peso do que sentiu — mas agora também carrega a força de ter atravessado tudo aquilo.' },
+    { image: 'cutscene_ending_2', text: 'Dessa vez, ela decide falar — e é ouvida. E quando vê um colega sozinho, do jeito que ela um dia esteve, Maya não hesita: se aproxima, e estende a mão.' }
+];
+
+window.GAME_LEVELS = GAME_LEVELS;
+window.ENDING_CUTSCENE = ENDING_CUTSCENE;

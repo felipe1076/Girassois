@@ -14,6 +14,7 @@
 
         <!-- Camada de Interface Superior (HUD) -->
         <div id="ui-layer">
+            <button id="btn-cutscene-skip" class="cutscene-skip hidden" type="button">Pular ⏭</button>
             <div class="hud-top">
                 <div class="hud-left">
                     <div id="hearts-container" class="hearts-container">
@@ -55,6 +56,11 @@
                         <div id="wave-cooldown-overlay" class="cooldown-overlay"></div>
                     </button>
 
+                    <button id="btn-shield-ability" class="ability-btn shield-btn" title="Ativar Escudo (Tecla C)">
+                        <span>🛡️ Escudo [C]</span>
+                        <div id="shield-cooldown-overlay" class="cooldown-overlay"></div>
+                    </button>
+
                     <div id="level-name-display" class="level-title-badge">Fase 1</div>
                     <button id="btn-mode-toggle" class="btn-icon" title="Alternar Modo: Computador (Teclado) / Tablet (Botões na Tela)">📱</button>
                     <button id="btn-sound-toggle" class="btn-icon" title="Ativar/Desativar Som">🔊</button>
@@ -73,56 +79,92 @@
 
         <!-- Tela de Início -->
         <div id="modal-start" class="modal-screen hidden">
-            <h1>🌻 Girassóis: A Jornada da Empatia</h1>
-            <h2>Setembro Amarelo — 7 Fases de Aventura, Puzzles & Chefe Final</h2>
-            <p>
-                Uma jornada sensível de autodescoberta e saúde mental.
-                Desvie dos sentimentos difíceis, use sua <strong>Onda de Luz [E]</strong> para revelar caminhos e acolher a dor,
-                e colabore com seu fiel <strong>Coelho de Apoio Emocional</strong> usando <strong>[F]</strong> para solucionar quebra-cabeças!
-            </p>
+            <video class="menu-video-background" autoplay muted loop playsinline aria-hidden="true">
+                <source src="assets/video/modern-abstract-background.mp4" type="video/mp4">
+            </video>
+            <div class="start-menu-content">
+                <h1>🌻 Girassóis: A Jornada da Empatia</h1>
+                <h2>Uma jornada de empatia e aventura</h2>
 
-            <!-- Seletor de Modo: Computador vs Tablet -->
-            <div class="mode-select-box">
-                <span class="mode-select-label">Como deseja jogar?</span>
-                <div class="mode-select-buttons">
-                    <button id="btn-select-pc" class="btn-mode-choice active" type="button">
-                        <span class="mode-icon">💻</span>
-                        <div class="mode-text">
-                            <strong>Computador</strong>
-                            <small>Teclado</small>
-                        </div>
-                    </button>
-                    <button id="btn-select-tablet" class="btn-mode-choice" type="button">
-                        <span class="mode-icon">📱</span>
-                        <div class="mode-text">
-                            <strong>Tablet / Toque</strong>
-                            <small>Botões na tela</small>
-                        </div>
-                    </button>
+                <!-- Seletor de Modo: Computador vs Tablet -->
+                <div class="mode-select-box">
+                    <div class="mode-select-buttons">
+                        <button id="btn-select-pc" class="btn-mode-choice active" type="button">
+                            <span class="mode-icon">💻</span>
+                            <div class="mode-text">
+                                <strong>Computador</strong>
+                            </div>
+                        </button>
+                        <button id="btn-select-tablet" class="btn-mode-choice" type="button">
+                            <span class="mode-icon">📱</span>
+                            <div class="mode-text">
+                                <strong>Tablet / Toque</strong>
+                            </div>
+                        </button>
+                    </div>
                 </div>
-            </div>
 
-            <!-- Dicas de Controle para PC -->
-            <div id="hint-pc" class="controls-hint">
-                <div><span class="key-tag">←</span> <span class="key-tag">→</span> ou <span class="key-tag">A</span> <span class="key-tag">D</span> Mover</div>
-                <div><span class="key-tag">Espaço</span> ou <span class="key-tag">W</span> / <span class="key-tag">↑</span> Pular (Pulo Duplo)</div>
-                <div><span class="key-tag">E</span> ou <span class="key-tag">J</span> Onda de Luz & Disparo Solar</div>
-                <div><span class="key-tag">F</span> ou <span class="key-tag">Q</span> Comandar Coelho</div>
-                <div><span class="key-tag">M</span> Som</div>
-            </div>
+                <div class="start-menu-actions">
+                    <button id="btn-start" class="btn-primary start-play-button">JOGAR</button>
+                    <div class="start-secondary-actions">
+                        <button id="btn-open-level-select" class="btn-primary" type="button">ESCOLHER FASE</button>
+                        <button id="btn-open-ranking" class="btn-primary" type="button">HALL DOS GIRASSÓIS</button>
+                    </div>
+                </div>
 
-            <!-- Dicas de Controle para Tablet -->
-            <div id="hint-tablet" class="controls-hint hidden">
-                <div><span class="key-tag">◀</span> <span class="key-tag">▶</span> Mover (D-Pad na tela)</div>
-                <div><span class="key-tag">⬆ PULAR</span> Pulo Simples & Pulo Duplo</div>
-                <div><span class="key-tag">✨ LUZ</span> Onda de Luz & Disparo Solar</div>
-                <div><span class="key-tag">🐰 COELHO</span> Mandar Seguir ou Esperar</div>
-            </div>
+                <div id="hint-pc" class="controls-hint start-controls-hint">
+                    A/D mover <span>•</span> Espaço pular <span>•</span> E habilidade <span>•</span> F coelho
+                </div>
+                <div id="hint-tablet" class="controls-hint start-controls-hint hidden">
+                    Controles de movimento, pulo e habilidades na tela
+                </div>
 
-            <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 10px;">
-                <button id="btn-start" class="btn-primary">Iniciar Jornada Completa 💛</button>
-                <button id="btn-start-runner" class="btn-primary" type="button" style="background: linear-gradient(135deg, #0284c7, #0f766e); border-color: #38bdf8;">Fase 3: Corrida da Superação</button>
-                <button id="btn-start-boss" class="btn-primary" type="button" style="background: linear-gradient(135deg, #7b2cbf, #c1121f); border-color: #ffd700;">Chefe Final (Fase 7) 👾</button>
+                <button id="btn-change-group" class="btn-subtle start-change-group" type="button">Trocar grupo</button>
+            </div>
+            <p class="start-menu-footer">
+                Jogo desenvolvido para um projeto pedagógico da disciplina de Projetos Integradores da Unidade Escolar Cezar Leal.
+            </p>
+        </div>
+
+        <div id="modal-group-setup" class="modal-screen hidden">
+            <h1>🌻 Identificação do grupo</h1>
+            <p>Informe o grupo e a turma para iniciar a jornada completa.</p>
+            <form id="group-setup-form" class="group-setup-form" novalidate>
+                <label for="group-name-input">Nome do grupo</label>
+                <input id="group-name-input" name="grupo" type="text" maxlength="24" required autocomplete="organization" />
+                <label for="group-class-input">Turma</label>
+                <input id="group-class-input" name="turma" type="text" maxlength="10" placeholder="Ex.: 7º A" required />
+                <p id="group-setup-error" class="form-error" role="alert" aria-live="polite"></p>
+                <div class="group-setup-actions">
+                    <button class="btn-primary" type="submit">Começar 🌻</button>
+                    <button id="btn-cancel-group-setup" class="btn-subtle" type="button">Voltar</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Seleção de Fases -->
+        <div id="modal-level-select" class="modal-screen hidden">
+            <h1>Escolha sua Fase</h1>
+            <div id="level-select-grid"></div>
+            <button id="btn-level-select-credits" class="btn-subtle" type="button">CRÉDITOS</button>
+            <button id="btn-back-level-select" class="btn-primary" type="button">Voltar</button>
+        </div>
+
+        <!-- Hall do Ranking -->
+        <div id="modal-ranking" class="modal-screen hidden">
+            <div class="ranking-panel">
+                <h1>🏆 Hall dos Girassóis</h1>
+                <div class="ranking-filter">
+                    <label for="ranking-class-filter">Turma</label>
+                    <select id="ranking-class-filter">
+                        <option value="">Todas as turmas</option>
+                    </select>
+                </div>
+                <div id="ranking-list" class="ranking-list"></div>
+                <div class="ranking-actions">
+                    <button id="btn-export-ranking" class="btn-primary" type="button">Exportar CSV</button>
+                    <button id="btn-close-ranking" class="btn-primary" type="button">Voltar</button>
+                </div>
             </div>
         </div>
 
@@ -131,6 +173,7 @@
             <h1>✨ Fase Concluída!</h1>
             <h2 id="modal-level-title">Parabéns!</h2>
             <p id="modal-level-msg">Você acolheu seus sentimentos e encontrou um novo caminho.</p>
+            <div id="ranking-bonus-list" class="ranking-bonus-list"></div>
             <button id="btn-next-level" class="btn-primary">Avançar para a Próxima Fase 🌻</button>
         </div>
 
@@ -150,9 +193,18 @@
             <h1>🌻 Você Iluminou Toda a Jornada! 🌻</h1>
             <h2>A Vida Sempre Vale a Pena</h2>
             <p>
-                Você superou os abismos, resolveu os enigmas da mente ao lado do seu coelhinho e completou as 7 fases (incluindo a vitória contra a Grande Sombra)
-                com <strong><span id="victory-score">0</span> pontos de Empatia</strong> e conquistou <strong><span id="victory-achievements">0/9</span> Marcos de Superação</strong>!
+                Você superou os abismos, resolveu os enigmas da mente ao lado do seu coelhinho e completou as 9 fases (incluindo a vitória contra a Grande Sombra)
+                e conquistou <strong><span id="victory-achievements">0/8</span> Marcos de Superação</strong>!
             </p>
+
+            <div id="victory-ranking-summary" class="victory-ranking-summary">
+                <h3 id="victory-group">Grupo — Turma</h3>
+                <div><span>Pontos</span><strong id="victory-score">0</strong></div>
+                <div><span>Tempo</span><strong id="victory-time">0s</strong></div>
+                <div><span>Itens</span><strong id="victory-items">0</strong></div>
+                <div><span>Acolhidos</span><strong id="victory-rescued">0</strong></div>
+                <div><span>Posição</span><strong id="victory-position">—</strong></div>
+            </div>
 
             <div class="helpline-box">
                 <h3>Canais de Apoio e Valorização da Vida</h3>
@@ -162,8 +214,81 @@
                 <p>📞 <strong>Polícia Militar / Emergência:</strong> Ligue <strong>190</strong></p>
             </div>
 
-            <button id="btn-restart-game" class="btn-primary">Recomeçar a Jornada 💛</button>
+            <button id="btn-next-group" class="btn-primary" type="button">Próximo grupo →</button>
         </div>
+
+        <section id="credits-screen" class="credits-screen hidden" aria-label="Créditos do jogo">
+            <button id="btn-credits-continue" class="btn-primary credits-continue" type="button">Continuar →</button>
+            <div class="credits-viewport">
+                <div id="credits-roll" class="credits-roll">
+                    <h1>CRÉDITOS</h1>
+
+                    <section class="credits-section">
+                        <h2>ARTES</h2>
+                        <div class="credits-class">
+                            <h3>8º B</h3>
+                            <p>MARIA CLARA DE SOUSA DA SILVA</p>
+                            <p>MARIA ELOÍSA DE SOUSA MARTINS DO NASCIMENTO</p>
+                            <p>JENNIFER PAIVA DA SILVA</p>
+                            <p>LUCAS GABRIEL GOMES DE OLIVEIRA</p>
+                        </div>
+                        <div class="credits-class">
+                            <h3>9º B</h3>
+                            <p>ALICE LAUANNY VITORIO RODRIGUES</p>
+                            <p>WELYSON MARCELO FEITOSA DA SILVA</p>
+                            <p>FRANCISCO IAGO OLIVEIRA SOUSA</p>
+                        </div>
+                        <div class="credits-class">
+                            <h3>9º D</h3>
+                            <p>FRANCISCA RAAB GOMES DE SALES</p>
+                            <p>FERNANDA GABRIELLY RODRIGUES DE SOUSA</p>
+                        </div>
+                        <div class="credits-class">
+                            <h3>9º A</h3>
+                            <p>DAYLAN WESDLEY CARDOSO LIRA</p>
+                            <p>MARIA VITÓRIA DE SOUSA VIANA</p>
+                            <p>ANTONIO WELLIGTON SANTIAGO MACHADO</p>
+                            <p>WELDSON SARAIVA CARDOSO</p>
+                            <p>MARCOS PYETRO PESSOA ARAÚJO</p>
+                            <p>THIAGO DA SILVA SOUSA</p>
+                            <p>AMANDA MYRELLE SANTOS DE OLIVEIRA</p>
+                            <p>VÂNIA GABRIELA BARROS SANTOS</p>
+                        </div>
+                        <div class="credits-class">
+                            <h3>8º C</h3>
+                            <p>ANA CLARA SANTIAGO BATISTA</p>
+                            <p>ERYCA THALLYA BARBOSA CAVALCANTE</p>
+                            <p>GUSTAVO AUGUSTO DA SILVA LIMA</p>
+                            <p>RAYCA MARIA FERREIRA DE SOUSA</p>
+                            <p>MARIA PRISCILA DE MELO SOUSA</p>
+                            <p>RYAN DE SOUSA RODRIGUES</p>
+                        </div>
+                    </section>
+
+                    <section class="credits-section">
+                        <h2>HISTÓRIA</h2>
+                        <div class="credits-class">
+                            <h3>8º C</h3>
+                            <p>LÍDIA RAQUELL DE OLIVEIRA SOUSA</p>
+                            <p>YAN CARLOS FERREIRA DE SOUSA</p>
+                            <p>ELOAH ALBUQUERQUE MELO</p>
+                        </div>
+                    </section>
+
+                    <section class="credits-section">
+                        <h2>EQUIPE PEDAGÓGICA</h2>
+                        <div class="credits-class">
+                            <h3>Professor</h3>
+                            <p>FELIPE MODESTO CAVALCANTE</p>
+                        </div>
+                        <div class="credits-class">
+                            <h3>Formadora</h3>
+                            <p>ELIZETE</p>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </section>
 
         <!-- Camada de Controles Touch na Tela (Modo Tablet / Mobile) -->
         <div id="touch-controls-layer" class="touch-controls-layer hidden">
@@ -184,6 +309,11 @@
                         <span class="touch-icon">✨</span>
                         <span class="touch-label">LUZ [E]</span>
                     </button>
+                    <button id="touch-btn-shield" class="touch-btn touch-btn-action ability-shield" type="button" aria-label="Ativar escudo">
+                        <span class="touch-icon">🛡️</span>
+                        <span class="touch-label">ESCUDO [C]</span>
+                        <div id="touch-shield-cooldown-overlay" class="cooldown-overlay"></div>
+                    </button>
                     <button id="touch-btn-bunny" class="touch-btn touch-btn-action ability-bunny" type="button" aria-label="Comando do Coelho">
                         <span class="touch-icon">🐰</span>
                         <span class="touch-label">COELHO [F]</span>
@@ -195,6 +325,7 @@
                 </button>
             </div>
         </div>
+
     </div>
 
     <!-- Scripts do Jogo -->
@@ -203,6 +334,7 @@
     <script src="js/particles.js"></script>
     <script src="js/levels.js"></script>
     <script src="js/achievements.js"></script>
+    <script src="js/ranking.js"></script>
     <script src="js/game.js"></script>
 </body>
 </html>
