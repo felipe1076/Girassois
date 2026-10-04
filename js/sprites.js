@@ -99,6 +99,8 @@ class SpriteManager {
             'boss_perfil_1': 'assets/inimigos/perfil boss 1.png',
             'boss_perfil_2': 'assets/inimigos/perfil boss 2.png',
             'boss_perfil_3': 'assets/inimigos/perfil boss 3.png',
+            'boss_helper_1': 'assets/inimigos/ajudante_do_boss_final_1.png',
+            'boss_helper_2': 'assets/inimigos/ajudante_do_boss_final_2.png',
             'boss_dano_1': 'assets/inimigos/dano boss 1.png',
             'boss_dano_2': 'assets/inimigos/dano boss 2.png',
             'boss_dano_3': 'assets/inimigos/dano boss 3.png',
@@ -160,7 +162,7 @@ class SpriteManager {
 
             // Cenários das Fases (novos — 7 fundos)
             'bg_fase1': 'assets/cenarios/fase 1.png',
-            'bg_fase2': 'assets/cenarios/fase 2.jfif',
+            'bg_fase2': 'assets/cenarios/fase 2.png',
             'bg_fase3': 'assets/cenarios/fase 3.jfif',
             'bg_fase4': 'assets/cenarios/fase 4.jfif',
             'bg_fase5': 'assets/cenarios/fase 5.jfif',

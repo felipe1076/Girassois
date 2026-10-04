@@ -322,7 +322,7 @@ const GAME_LEVELS = [
             spritePrefix: "boss",
             spriteKey: "boss_shadow",
             studentSpriteKey: "boss_aluno",
-            x: 840,
+            x: 445,
             y: 365,
             w: 70,
             h: 95,

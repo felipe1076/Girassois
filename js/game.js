@@ -34,11 +34,15 @@ class Game {
 
         // Habilidade Onda de Luz
         this.waveCooldown = 0;
-        this.maxWaveCooldown = 2.2;
+        this.maxWaveCooldown = 0.8;
         this.shieldTimer = 0;
         this.shieldCooldown = 0;
         this.maxShieldDuration = 1.2;
         this.maxShieldCooldown = 8;
+        this.bossAuraCharge = 0;
+        this.bossAuraChargeFrames = 0;
+        this.bossAuraEffectTimer = 0;
+        this.bossAuraMaxCharge = 65;
         this.phase1LightPulse = 0;
         this.phase1DarkTimer = 0;
 
@@ -105,6 +109,7 @@ class Game {
             isAttacking: false,
             attackTimer: 0
         };
+        this.bossMascotRescueUsed = false;
 
         // Coelho de Apoio Emocional
         this.bunny = {
@@ -186,6 +191,9 @@ class Game {
             }
             if ((code === 'KeyC' || key === 'c' || key === 'C') && !e.repeat) {
                 this.activateShield();
+            }
+            if ((code === 'KeyR' || key === 'r' || key === 'R') && !e.repeat) {
+                this.activateBossAura();
             }
             // Comando do Coelho (F ou Q)
             if (code === 'KeyF' || key === 'f' || key === 'F' || code === 'KeyQ' || key === 'q' || key === 'Q') {
@@ -350,6 +358,13 @@ class Game {
             null
         );
 
+        bindButton('touch-btn-boss-aura',
+            () => {
+                this.activateBossAura();
+            },
+            null
+        );
+
         // Comando do Coelho
         bindButton('touch-btn-bunny',
             () => {
@@ -466,6 +481,10 @@ class Game {
 
         addClick('btn-shield-ability', () => {
             this.activateShield();
+        });
+
+        addClick('btn-boss-aura', () => {
+            this.activateBossAura();
         });
 
         addClick('btn-bunny-toggle', () => {
@@ -637,10 +656,14 @@ class Game {
         this.player.vy = 0;
         this.player.facing = 1;
         this.player.hearts = this.player.maxHearts;
+        this.bossMascotRescueUsed = false;
         this.player.isInvulnerable = false;
         this.player.invulnerableTimer = 0;
         this.shieldTimer = 0;
         this.shieldCooldown = 0;
+        this.bossAuraCharge = 0;
+        this.bossAuraChargeFrames = 0;
+        this.bossAuraEffectTimer = 0;
         const shieldCooldownOverlay = document.getElementById('shield-cooldown-overlay');
         if (shieldCooldownOverlay) shieldCooldownOverlay.style.width = '0%';
         const touchShieldCooldownOverlay = document.getElementById('touch-shield-cooldown-overlay');
@@ -678,12 +701,16 @@ class Game {
         this.isRunner = !!levelConfig.isRunnerLevel;
         this.isSurf = !!levelConfig.isSurfLevel;
         this.setControlMode(this.controlMode, false);
-        document.getElementById('game-container').classList.toggle('surf-active', this.isSurf);
+        const gameContainer = document.getElementById('game-container');
+        gameContainer.classList.toggle('surf-active', this.isSurf);
+        gameContainer.classList.toggle('final-boss-active', levelConfig.boss?.spritePrefix === 'boss');
         const isAutoRunner = this.isRunner || this.isSurf;
         const waveButton = document.getElementById('btn-wave-ability');
         const touchWaveButton = document.getElementById('touch-btn-wave');
         const shieldButton = document.getElementById('btn-shield-ability');
         const touchShieldButton = document.getElementById('touch-btn-shield');
+        const bossAuraButton = document.getElementById('btn-boss-aura');
+        const touchBossAuraButton = document.getElementById('touch-btn-boss-aura');
         const bunnyButton = document.getElementById('btn-bunny-toggle');
         const touchBunnyButton = document.getElementById('touch-btn-bunny');
         const touchJumpButton = document.getElementById('touch-btn-jump');
@@ -691,6 +718,9 @@ class Game {
         if (touchWaveButton) touchWaveButton.classList.toggle('hidden', isAutoRunner);
         if (shieldButton) shieldButton.classList.toggle('hidden', levelConfig.id !== 9);
         if (touchShieldButton) touchShieldButton.classList.toggle('hidden', levelConfig.id !== 9);
+        const isFinalBossLevel = levelConfig.boss?.spritePrefix === 'boss';
+        if (bossAuraButton) bossAuraButton.classList.toggle('hidden', !isFinalBossLevel);
+        if (touchBossAuraButton) touchBossAuraButton.classList.toggle('hidden', !isFinalBossLevel);
         if (bunnyButton) bunnyButton.classList.toggle('hidden', isAutoRunner || !!levelConfig.hideBunny);
         if (touchBunnyButton) touchBunnyButton.classList.toggle('hidden', isAutoRunner || !!levelConfig.hideBunny);
         if (touchJumpButton) touchJumpButton.classList.toggle('hidden', this.isSurf);
@@ -772,14 +802,23 @@ class Game {
         this.bossShockwaves = [];
         this.playerProjectiles = [];
         if (levelConfig.isBossLevel && levelConfig.boss) {
+            const isFinalBoss = levelConfig.boss.spritePrefix === 'boss';
+            const arenaWidth = levelConfig.width || this.canvas.width;
+            const arenaGroundY = levelConfig.groundY || 460;
+            const initialBossX = isFinalBoss
+                ? arenaWidth - levelConfig.boss.w - 35
+                : levelConfig.boss.x;
+            const initialBossY = isFinalBoss
+                ? arenaGroundY - levelConfig.boss.h
+                : levelConfig.boss.y;
             this.boss = {
                 name: levelConfig.boss.name,
                 title: levelConfig.boss.title,
                 spritePrefix: levelConfig.boss.spritePrefix || 'boss',
                 studentSpriteKey: levelConfig.boss.studentSpriteKey,
                 particleColor: levelConfig.boss.particleColor,
-                x: levelConfig.boss.x,
-                y: levelConfig.boss.y,
+                x: initialBossX,
+                y: initialBossY,
                 baseX: levelConfig.boss.x,
                 baseY: levelConfig.boss.y,
                 w: levelConfig.boss.w,
@@ -794,20 +833,26 @@ class Game {
                 movePhase: Math.random() * Math.PI * 2,
                 moveAmplitude: 120,
                 lastHitProfile: 1,
-                phase: levelConfig.boss.spritePrefix === 'boss' ? 'RIGHT_CAST' : null,
-                phaseTimer: levelConfig.boss.spritePrefix === 'boss' ? 4 : 0,
+                phase: isFinalBoss ? 'RIGHT_CAST' : null,
+                phaseTimer: isFinalBoss ? 10 : 0,
                 phaseElapsed: 0,
                 castTimer: 0.35,
                 minionTimer: 0.8,
-                phaseStartX: levelConfig.boss.x,
-                phaseStartY: levelConfig.boss.y,
-                phaseTargetX: levelConfig.boss.x,
-                phaseTargetY: levelConfig.boss.y,
+                phaseStartX: initialBossX,
+                phaseStartY: initialBossY,
+                phaseTargetX: initialBossX,
+                phaseTargetY: initialBossY,
+                phaseMoveDuration: 4,
+                initialRightCast: isFinalBoss,
                 burstTriggered: false
             };
+            if (this.boss.spritePrefix === 'boss') {
+                this.boss.movePhase = Math.random() * Math.PI * 2;
+            }
         }
 
         this.updateHud();
+        this.updateBossAuraHud();
         this.hideAllModals();
         if (this.isSurf) {
             const banner = document.getElementById('phrase-banner');
@@ -894,6 +939,91 @@ class Game {
         this.shieldCooldown = this.maxShieldCooldown;
         audio.playWave();
         particles.emitSparks(this.player.x + this.player.w / 2, this.player.y + this.player.h / 2, 18, '#80d8ff');
+    }
+
+    activateBossAura() {
+        if (this.state !== 'PLAYING' ||
+            this.currentLevel?.boss?.spritePrefix !== 'boss' ||
+            !this.boss ||
+            this.boss.state === 'DEFEATED' ||
+            this.bossAuraCharge < this.bossAuraMaxCharge) return;
+
+        const removedHelpers = this.obstacles.filter(obstacle => obstacle.type === 'boss_helper');
+        this.obstacles = this.obstacles.filter(obstacle => obstacle.type !== 'boss_helper');
+        for (const helper of removedHelpers) {
+            particles.emitSparks(helper.x + helper.w / 2, helper.y + helper.h / 2, 18, '#b388ff');
+        }
+
+        this.bossAuraCharge = 0;
+        this.bossAuraChargeFrames = 0;
+        this.bossAuraEffectTimer = 0.85;
+        const centerX = this.player.x + this.player.w / 2;
+        const centerY = this.player.y + this.player.h / 2;
+        particles.emitSparks(centerX, centerY, 36, '#c6a7ff');
+        particles.emitText(centerX, this.player.y - 10, '✨ Super Aura!', '#e1bee7');
+        audio.playWave();
+        this.updateBossAuraHud();
+    }
+
+    updateBossAura() {
+        const inFinalBossFight = this.currentLevel?.boss?.spritePrefix === 'boss' &&
+            this.boss &&
+            this.boss.state !== 'DEFEATED';
+        if (inFinalBossFight) {
+            this.bossAuraChargeFrames = Math.min(this.bossAuraMaxCharge * 60, this.bossAuraChargeFrames + 1);
+            this.bossAuraCharge = this.bossAuraChargeFrames / 60;
+        }
+
+        this.bossAuraEffectTimer = Math.max(0, this.bossAuraEffectTimer - 1 / 60);
+        this.updateBossAuraHud();
+    }
+
+    updateBossAuraHud() {
+        const isFinalBossLevel = this.currentLevel?.boss?.spritePrefix === 'boss';
+        const chargePercent = isFinalBossLevel
+            ? Math.min(100, Math.floor(this.bossAuraCharge / this.bossAuraMaxCharge * 100))
+            : 0;
+        const isReady = isFinalBossLevel && chargePercent >= 100;
+
+        for (const [buttonId, labelId, fillId] of [
+            ['btn-boss-aura', 'boss-aura-label', 'boss-aura-progress-fill'],
+            ['touch-btn-boss-aura', 'touch-boss-aura-label', 'touch-boss-aura-progress-fill']
+        ]) {
+            const button = document.getElementById(buttonId);
+            const label = document.getElementById(labelId);
+            const fill = document.getElementById(fillId);
+            if (label) label.textContent = isReady ? 'AURA 100% [R]' : `AURA ${chargePercent}%`;
+            if (fill) fill.style.width = `${chargePercent}%`;
+            if (button) {
+                button.disabled = !isReady || this.boss?.state === 'DEFEATED';
+                button.setAttribute('aria-label', `Super Aura: ${chargePercent}%${isReady ? ', disponível' : ', carregando'}`);
+            }
+        }
+    }
+
+    renderBossAura(ctx) {
+        if (this.bossAuraEffectTimer <= 0 || this.currentLevel?.boss?.spritePrefix !== 'boss') return;
+
+        const progress = 1 - this.bossAuraEffectTimer / 0.85;
+        const radius = 42 + progress * 125;
+        const alpha = 1 - progress;
+        const centerX = this.player.x + this.player.w / 2 - this.cameraX;
+        const centerY = this.player.y + this.player.h / 2;
+
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.shadowColor = '#c6a7ff';
+        ctx.shadowBlur = 28;
+        ctx.strokeStyle = '#e1bee7';
+        ctx.lineWidth = 7 * (1 - progress) + 2;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(179, 136, 255, 0.14)';
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
     }
 
     updateShieldTimers() {
@@ -1047,6 +1177,19 @@ updateHud() {
         img.className = 'heart-icon' + (i < this.player.hearts ? '' : ' lost');
         img.src = i < this.player.hearts ? 'assets/itens/hud_coracao.png' : 'assets/itens/hud_coracao_vazio.png';
         heartsContainer.appendChild(img);
+    }
+    const isFinalBossBattle = this.currentLevel?.boss?.spritePrefix === 'boss';
+    if (isFinalBossBattle) {
+        const livesLabel = `Vidas da personagem: ${this.player.hearts}/${this.player.maxHearts}`;
+        heartsContainer.setAttribute('aria-label', livesLabel);
+        heartsContainer.title = livesLabel;
+        const livesCount = document.createElement('span');
+        livesCount.className = 'hearts-count';
+        livesCount.textContent = `${this.player.hearts}/${this.player.maxHearts}`;
+        heartsContainer.appendChild(livesCount);
+    } else {
+        heartsContainer.removeAttribute('aria-label');
+        heartsContainer.removeAttribute('title');
     }
 
     const hopeBar = document.getElementById('hope-bar-fill');
@@ -1218,6 +1361,7 @@ showGameOverModal() {
         if (this.state !== 'PLAYING') return;
 
         this.updateShieldTimers();
+        this.updateBossAura();
 
         if (this.isSurf) {
             this.updateSurf();
@@ -1663,6 +1807,14 @@ showGameOverModal() {
         if (this.player.isInvulnerable || this.shieldTimer > 0) return;
 
         this.player.hearts = Math.max(0, this.player.hearts - 1);
+        const isFinalBossFight = this.currentLevel?.boss?.spritePrefix === 'boss';
+        if (isFinalBossFight && this.player.hearts === 1 && !this.bossMascotRescueUsed) {
+            this.bossMascotRescueUsed = true;
+            this.player.hearts = Math.min(this.player.maxHearts, this.player.hearts + 2);
+            audio.playHeartGain();
+            particles.emitHearts(this.bunny.x + this.bunny.w / 2, this.bunny.y, 8);
+            particles.emitText(this.bunny.x + this.bunny.w / 2, this.bunny.y - 12, '🐰 +2 vidas!', '#ff80ab');
+        }
         this.player.isInvulnerable = true;
         this.player.invulnerableTimer = 1.2;
 
@@ -2672,6 +2824,7 @@ showGameOverModal() {
         this.renderPlayerProjectiles(ctx);
         if (!this.currentLevel.hideBunny) this.renderBunny(ctx);
         this.renderPlayer(ctx);
+        this.renderBossAura(ctx);
         particles.draw(ctx, this.cameraX);
 
         if (this.boss) this.renderBossHud(ctx);
@@ -3022,7 +3175,7 @@ showGameOverModal() {
 
         if (this.currentLevel.id === 9 && this.boss && this.boss.state !== 'DEFEATED') {
             isLocked = true;
-            lockText = 'DERROTE A GRANDE SOMBRA';
+            lockText = '';
         }
 
         const portalSpriteKey = isLocked ? 'portal_fechado' : 'portal_aberto';
@@ -3085,19 +3238,38 @@ showGameOverModal() {
 
             ctx.save();
             const flip = obs.vx < 0;
-            const visualScale = 0.65;
-            const visualW = obs.w * visualScale;
-            const visualH = obs.h * visualScale;
-            const visualX = screenX + (obs.w - visualW) / 2;
-            const visualY = drawY + obs.h - visualH;
-            sprites.draw(ctx, obs.type, visualX, visualY, visualW, visualH, flip);
+            if (obs.type === 'boss_helper' && this.currentLevel?.boss?.spritePrefix === 'boss') {
+                const elapsed = Math.max(0, Date.now() - obs.spawnedAt);
+                const frame = Math.floor(elapsed / 260) % 2 + 1;
+                const spriteKey = `boss_helper_${frame}`;
+                const image = sprites.get(spriteKey);
+                const visualH = obs.h * 0.65;
+                const aspectRatio = image && image.naturalWidth > 0 && image.naturalHeight > 0
+                    ? image.naturalWidth / image.naturalHeight
+                    : 385 / 457;
+                const visualW = visualH * aspectRatio;
+                const visualX = screenX + (obs.w - visualW) / 2;
+                const visualY = drawY + obs.h - visualH;
+                sprites.draw(ctx, spriteKey, visualX, visualY, visualW, visualH, flip);
+            } else {
+                const visualScale = 0.65;
+                const visualW = obs.w * visualScale;
+                const visualH = obs.h * visualScale;
+                const visualX = screenX + (obs.w - visualW) / 2;
+                const visualY = drawY + obs.h - visualH;
+                sprites.draw(ctx, obs.type, visualX, visualY, visualW, visualH, flip);
+            }
 
-            ctx.font = 'bold 11px "Segoe UI", Arial';
-            ctx.fillStyle = '#dcdde1';
-            ctx.textAlign = 'center';
-            ctx.shadowColor = '#000';
-            ctx.shadowBlur = 3;
-            ctx.fillText(obs.name, screenX + obs.w / 2, drawY - 6);
+            const isFinalBossHelper = obs.type === 'boss_helper' &&
+                this.currentLevel?.boss?.spritePrefix === 'boss';
+            if (!isFinalBossHelper && obs.name) {
+                ctx.font = 'bold 11px "Segoe UI", Arial';
+                ctx.fillStyle = '#dcdde1';
+                ctx.textAlign = 'center';
+                ctx.shadowColor = '#000';
+                ctx.shadowBlur = 3;
+                ctx.fillText(obs.name, screenX + obs.w / 2, drawY - 6);
+            }
             ctx.restore();
         }
     }
@@ -3366,45 +3538,63 @@ showGameOverModal() {
     }
 
     updateFinalBossCycle(boss, particleColor) {
-        const deltaTime = 0.016;
+        const deltaTime = 1 / 60;
         boss.phaseTimer -= deltaTime;
         boss.phaseElapsed += deltaTime;
         boss.state = boss.phase;
 
         if (boss.phase === 'RIGHT_CAST') {
-            boss.castTimer -= deltaTime;
-            boss.minionTimer -= deltaTime;
+            if (boss.phaseElapsed <= 4) {
+                boss.castTimer -= deltaTime;
+                boss.minionTimer -= deltaTime;
 
-            if (boss.castTimer <= 0) {
-                this.fireFinalBossProjectiles(boss, particleColor);
-                boss.castTimer = 0.95;
+                if (boss.castTimer <= 0) {
+                    this.fireFinalBossProjectiles(boss, particleColor);
+                    boss.castTimer = 0.95;
+                }
+                if (boss.minionTimer <= 0) {
+                    this.spawnFinalBossMinion(boss, particleColor);
+                    boss.minionTimer = 1.6;
+                }
             }
-            if (boss.minionTimer <= 0) {
-                this.spawnFinalBossMinion(boss, particleColor);
-                boss.minionTimer = 1.6;
-            }
-        } else if (boss.phase === 'TRANSIT_LEFT') {
+        } else if (boss.phase.startsWith('TRANSIT_')) {
             this.moveFinalBossDuringPhase(boss);
-        } else if (boss.phase === 'CENTER_BURST') {
-            this.moveFinalBossDuringPhase(boss);
-            if (!boss.burstTriggered && boss.phaseElapsed >= 0.55) {
-                this.fireFinalBossShockwaves(boss, particleColor);
-                boss.burstTriggered = true;
-            }
+        }
+
+        if (boss.phase === 'TOP_REST' && !boss.burstTriggered) {
+            this.fireFinalBossShockwaves(boss, particleColor);
+            boss.burstTriggered = true;
         }
 
         if (boss.phaseTimer > 0) return;
 
-        if (boss.phase === 'RIGHT_CAST') {
-            this.enterFinalBossPhase(boss, 'TRANSIT_LEFT', 1.2, 50, 460 - boss.h);
-        } else if (boss.phase === 'TRANSIT_LEFT') {
-            this.enterFinalBossPhase(boss, 'CENTER_BURST', 2.5, 400 + (160 - boss.w) / 2, 160 - boss.h);
-        } else if (boss.phase === 'CENTER_BURST') {
-            this.enterFinalBossPhase(boss, 'LEFT_REST', 2, 50, 460 - boss.h);
-        } else {
-            this.enterFinalBossPhase(boss, 'RIGHT_CAST', 4, this.canvas.width - boss.w - 50, 460 - boss.h);
+        const groundY = (this.currentLevel.groundY || 460) - boss.h;
+        const leftX = 35;
+        const rightX = this.currentLevel.width - boss.w - 35;
+        if (boss.phase === 'TRANSIT_LEFT') {
+            this.enterFinalBossPhase(boss, 'LEFT_REST', 10, leftX, groundY);
+        } else if (boss.phase === 'LEFT_REST') {
+            this.enterFinalBossPhase(boss, 'TRANSIT_RIGHT', 2.5, rightX, groundY);
+        } else if (boss.phase === 'TRANSIT_RIGHT') {
+            this.enterFinalBossPhase(boss, 'RIGHT_CAST', 10, rightX, groundY);
             boss.castTimer = 0.35;
             boss.minionTimer = 0.8;
+        } else if (boss.phase === 'RIGHT_CAST') {
+            if (boss.initialRightCast) {
+                boss.initialRightCast = false;
+                this.enterFinalBossPhase(boss, 'TRANSIT_LEFT', 2.5, leftX, groundY);
+            } else {
+                const centerPlatform = this.currentLevel.platforms.find(platform => platform.x === 400 && platform.y === 160);
+                const topX = centerPlatform
+                    ? centerPlatform.x + centerPlatform.w / 2 - boss.w / 2
+                    : (this.currentLevel.width - boss.w) / 2;
+                const topY = centerPlatform ? centerPlatform.y - boss.h : 24;
+                this.enterFinalBossPhase(boss, 'TRANSIT_TOP', 2.5, topX, topY);
+            }
+        } else if (boss.phase === 'TRANSIT_TOP') {
+            this.enterFinalBossPhase(boss, 'TOP_REST', 10, boss.x, boss.y);
+        } else if (boss.phase === 'TOP_REST') {
+            this.enterFinalBossPhase(boss, 'TRANSIT_LEFT', 2.5, leftX, groundY);
         }
     }
 
@@ -3417,14 +3607,17 @@ showGameOverModal() {
         boss.phaseStartY = boss.y;
         boss.phaseTargetX = targetX;
         boss.phaseTargetY = targetY;
+        boss.phaseMoveDuration = duration;
         boss.burstTriggered = false;
     }
 
     moveFinalBossDuringPhase(boss) {
-        const moveDuration = boss.phase === 'TRANSIT_LEFT' ? 1.2 : 0.55;
-        const progress = Math.min(1, boss.phaseElapsed / moveDuration);
-        boss.x = boss.phaseStartX + (boss.phaseTargetX - boss.phaseStartX) * progress;
-        boss.y = boss.phaseStartY + (boss.phaseTargetY - boss.phaseStartY) * progress;
+        const progress = Math.min(1, boss.phaseElapsed / boss.phaseMoveDuration);
+        const easedProgress = 0.5 - Math.cos(progress * Math.PI) / 2;
+        const maxX = Math.max(0, this.currentLevel.width - boss.w);
+        const maxY = Math.max(0, (this.currentLevel.groundY || 460) - boss.h);
+        boss.x = Math.max(0, Math.min(maxX, boss.phaseStartX + (boss.phaseTargetX - boss.phaseStartX) * easedProgress));
+        boss.y = Math.max(0, Math.min(maxY, boss.phaseStartY + (boss.phaseTargetY - boss.phaseStartY) * easedProgress));
     }
 
     fireFinalBossProjectiles(boss, particleColor) {
@@ -3451,17 +3644,17 @@ showGameOverModal() {
     spawnFinalBossMinion(boss, particleColor) {
         audio.playWave();
         this.obstacles.push({
-            type: 'obs_isolamento',
-            name: 'Dúvida Rastejante',
+            type: 'boss_helper',
             x: boss.x - 20,
-            y: 412,
-            w: 50,
-            h: 55,
+            y: 400,
+            w: 54,
+            h: 60,
             vx: -0.7,
             minX: 40,
-            maxX: boss.x - 10
+            maxX: boss.x - 10,
+            spawnedAt: Date.now()
         });
-        particles.emitSparks(boss.x - 20, 412, 10, particleColor);
+        particles.emitSparks(boss.x - 20, 400, 10, particleColor);
     }
 
     fireFinalBossShockwaves(boss, particleColor) {
@@ -3500,10 +3693,17 @@ showGameOverModal() {
         return `${prefix}_dano_3`;
     }
 
+    isFinalBossVulnerable(boss) {
+        if (boss.spritePrefix !== 'boss') return true;
+        return boss.phase === 'LEFT_REST' ||
+            boss.phase === 'RIGHT_CAST' ||
+            boss.phase === 'TOP_REST';
+    }
+
     damageBoss(amount = 1) {
         const boss = this.boss;
         if (!boss || boss.state === 'DEFEATED') return;
-        if (boss.spritePrefix === 'boss' && boss.phase !== 'RIGHT_CAST' && boss.phase !== 'LEFT_REST') return;
+        if (!this.isFinalBossVulnerable(boss)) return;
 
         boss.hp -= amount;
         boss.flashTimer = 0.25;
@@ -3540,7 +3740,7 @@ showGameOverModal() {
 
             // Acertou o Boss
             if (this.boss && this.boss.state !== 'DEFEATED' &&
-                (this.boss.spritePrefix !== 'boss' || this.boss.phase === 'RIGHT_CAST' || this.boss.phase === 'LEFT_REST')) {
+                this.isFinalBossVulnerable(this.boss)) {
                 const b = this.boss;
                 if (proj.x > b.x && proj.x < b.x + b.w && proj.y > b.y && proj.y < b.y + b.h) {
                     this.damageBoss(1);
@@ -3640,8 +3840,10 @@ showGameOverModal() {
         const particleColor = boss.particleColor || '#9c27b0';
         const screenX = boss.x - this.cameraX;
         const idleTime = Date.now() * BOSS_IDLE_SPEED + boss.movePhase;
-        const idleBob = Math.sin(idleTime * 1.7) * BOSS_IDLE_BOB;
-        const idleTilt = Math.sin(idleTime) * BOSS_IDLE_TILT;
+        const idleBobActive = !(boss.spritePrefix === 'boss' &&
+            (boss.phase === 'RIGHT_CAST' || boss.phase === 'TOP_REST'));
+        const idleBob = idleBobActive ? Math.sin(idleTime * 1.7) * BOSS_IDLE_BOB : 0;
+        const idleTilt = idleBobActive ? Math.sin(idleTime) * BOSS_IDLE_TILT : 0;
         const flamePulse = Math.sin(idleTime * 2.4) * BOSS_FLAME_SCALE;
 
         ctx.save();
@@ -3674,7 +3876,7 @@ showGameOverModal() {
             ctx.font = '90px sans-serif';
             ctx.textAlign = 'center';
             ctx.fillText('🌻', screenX + boss.w / 2, boss.y + boss.h / 2 + 35);
-        } else if (boss.spritePrefix === 'boss' && (boss.phase === 'TRANSIT_LEFT' || boss.phase === 'CENTER_BURST')) {
+        } else if (boss.spritePrefix === 'boss' && boss.phase.startsWith('TRANSIT_')) {
             const centerX = screenX + boss.w / 2;
             const centerY = boss.y + boss.h / 2;
             const radius = Math.max(boss.w, boss.h) * 0.48;

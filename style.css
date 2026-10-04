@@ -126,6 +126,14 @@ canvas {
     transform: scale(0.85);
 }
 
+.hearts-count {
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    margin-left: 3px;
+    white-space: nowrap;
+}
+
 .score-badge {
     display: flex;
     align-items: center;
@@ -205,6 +213,16 @@ canvas {
     pointer-events: auto;
 }
 
+#game-container.final-boss-active .hope-badge,
+#game-container.final-boss-active #level-name-display {
+    display: none;
+}
+
+#game-container.final-boss-active #btn-bunny-toggle,
+#game-container.final-boss-active #touch-btn-bunny {
+    display: none;
+}
+
 /* Ability Button [E] */
 .ability-btn {
     position: relative;
@@ -256,6 +274,41 @@ canvas {
 
 .shield-btn:hover {
     background: #80d8ff;
+}
+
+.boss-aura-btn {
+    background: linear-gradient(135deg, rgba(149, 117, 205, 0.42), rgba(103, 58, 183, 0.55));
+    border-color: #d1c4e9;
+    color: #fff;
+}
+
+.boss-aura-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.82;
+}
+
+.boss-aura-btn:not(:disabled) {
+    box-shadow: 0 0 14px rgba(209, 196, 233, 0.8);
+}
+
+.boss-aura-progress {
+    position: absolute;
+    right: 7px;
+    bottom: 3px;
+    left: 7px;
+    height: 3px;
+    overflow: hidden;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.3);
+    pointer-events: none;
+}
+
+.boss-aura-progress > div {
+    width: 0%;
+    height: 100%;
+    background: #e1bee7;
+    box-shadow: 0 0 6px #fff;
+    transition: width 0.2s linear;
 }
 
 .cooldown-overlay {
