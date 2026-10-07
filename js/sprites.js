@@ -127,6 +127,8 @@ class SpriteManager {
             'polvo_2': 'assets/inimigos/polvo_2.png',
             'gosma_1': 'assets/inimigos/gosma_1.png',
             'gosma_2': 'assets/inimigos/gosma_2.png',
+            'menina_1': 'assets/inimigos/menina_1.png',
+            'menina_2': 'assets/inimigos/menina_2.png',
             'obs_fantasma_tristeza_1': 'assets/inimigos/fantasma_tristeza_1.png',
             'obs_fantasma_tristeza_2': 'assets/inimigos/fantasma_tristeza_2.png',
             'obs_fantasma_tristeza_3': 'assets/inimigos/fantasma_tristeza_3.png',

@@ -3256,7 +3256,9 @@ showGameOverModal() {
                     ? 'polvo'
                     : this.currentLevel?.id === 2
                         ? 'gosma'
-                        : null;
+                        : this.currentLevel?.id === 6
+                            ? 'menina'
+                            : null;
                 const frame = Math.floor(Date.now() / 260) % 2 + 1;
                 const spriteKey = levelEnemyPrefix ? `${levelEnemyPrefix}_${frame}` : obs.type;
                 const visualScale = 0.65;
