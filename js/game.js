@@ -3252,12 +3252,19 @@ showGameOverModal() {
                 const visualY = drawY + obs.h - visualH;
                 sprites.draw(ctx, spriteKey, visualX, visualY, visualW, visualH, flip);
             } else {
+                const levelEnemyPrefix = this.currentLevel?.id === 1
+                    ? 'polvo'
+                    : this.currentLevel?.id === 2
+                        ? 'gosma'
+                        : null;
+                const frame = Math.floor(Date.now() / 260) % 2 + 1;
+                const spriteKey = levelEnemyPrefix ? `${levelEnemyPrefix}_${frame}` : obs.type;
                 const visualScale = 0.65;
                 const visualW = obs.w * visualScale;
                 const visualH = obs.h * visualScale;
                 const visualX = screenX + (obs.w - visualW) / 2;
                 const visualY = drawY + obs.h - visualH;
-                sprites.draw(ctx, obs.type, visualX, visualY, visualW, visualH, flip);
+                sprites.draw(ctx, spriteKey, visualX, visualY, visualW, visualH, flip);
             }
 
             const isFinalBossHelper = obs.type === 'boss_helper' &&

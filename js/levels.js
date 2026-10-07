@@ -158,7 +158,7 @@ const GAME_LEVELS = [
         cutscene: [
             { image: 'cutscene_fase5_1', text: 'Na margem oposta, alguém a aguarda. Um ser que um dia tentou se moldar ao que o mundo diz que se deve ser: rico, belo, perfeito. Mas quanto mais se enfeitava por fora, mais a dor crescia por dentro — até restar apenas a máscara, e o vazio embaixo dela.' }
         ],
-        bgKey: "lago_ceu",
+        bgKey: "fase_do_narcisio",
         width: 960,
         groundY: 460,
         parTime: 125,
@@ -183,8 +183,8 @@ const GAME_LEVELS = [
             y: 220,
             w: 200,
             h: 220,
-            maxHp: 6,
-            hp: 6,
+            maxHp: 8,
+            hp: 8,
             particleColor: "#8e7cc3"
         },
         obstacles: [],
@@ -326,8 +326,8 @@ const GAME_LEVELS = [
             y: 365,
             w: 70,
             h: 95,
-            maxHp: 8,
-            hp: 8
+            maxHp: 5,
+            hp: 5
         },
         obstacles: [],
         items: [

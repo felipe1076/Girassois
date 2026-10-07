@@ -123,6 +123,10 @@ class SpriteManager {
             'obs_controlador': 'assets/inimigos/controlador.png',
             'obs_financeiro':  'assets/inimigos/financeiro.png',
             'obs_abusador':    'assets/inimigos/abusador.png',
+            'polvo_1': 'assets/inimigos/polvo_1.png',
+            'polvo_2': 'assets/inimigos/polvo_2.png',
+            'gosma_1': 'assets/inimigos/gosma_1.png',
+            'gosma_2': 'assets/inimigos/gosma_2.png',
             'obs_fantasma_tristeza_1': 'assets/inimigos/fantasma_tristeza_1.png',
             'obs_fantasma_tristeza_2': 'assets/inimigos/fantasma_tristeza_2.png',
             'obs_fantasma_tristeza_3': 'assets/inimigos/fantasma_tristeza_3.png',
@@ -168,6 +172,7 @@ class SpriteManager {
             'bg_fase5': 'assets/cenarios/fase 5.jfif',
             'bg_fase6': 'assets/cenarios/fase 6.png',
             'bg_fase7': 'assets/cenarios/fase 7.png',
+            'fase_do_narcisio': 'assets/cenarios/fase_do_narcisio.png',
 
             // Cutscenes
             'cutscene_fase1_1': 'assets/cutscenes/fase1_1.png',
